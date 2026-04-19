@@ -2,78 +2,274 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>GeoSistema PRO - Memorial Padrão Cartório</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoSistema PRO | Relatório Técnico</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <link rel="stylesheet" href="estilo.css">
+    <style>
+        body { font-family: serif; margin: 0; padding: 0; background: #ddd; }
+
+        .no-print {
+            background: #1a73e8; padding: 10px; display: flex; gap: 10px;
+            position: sticky; top: 0; z-index: 2000; align-items: center; flex-wrap: wrap;
+        }
+        .no-print button {
+            padding: 7px 14px; border: none; border-radius: 4px;
+            cursor: pointer; font-weight: bold; font-size: 13px; color: white;
+        }
+
+        .container-relatorio { max-width: 21cm; margin: 10px auto; background: white; padding: 1cm; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .flex-container { display: flex; gap: 15px; margin: 20px 0; }
+
+        #listaSelecao { flex: 1; height: 500px; overflow-y: auto; border: 1px solid #ccc; background: #f9f9f9; padding: 10px; }
+        #map { flex: 2; height: 500px; border: 1px solid #000; }
+
+        .ponto-item { display: block; width: 100%; text-align: left; margin-bottom: 5px;
+            padding: 8px; cursor: pointer; border: 1px solid #ddd; background: white;
+            font-size: 12px; border-radius: 3px; }
+        .ponto-item:hover { background: #f0f0f0; }
+        .ponto-item.active { background: #d1e7dd; border-color: #0f5132; font-weight: bold; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 10pt; }
+        th, td { border: 1px solid black; padding: 5px; text-align: center; }
+        th { background: #f0f0f0; }
+
+        .page-break { page-break-before: always; }
+
+        #statusImportacao { font-size: 11px; margin-top: 5px; min-height: 16px; }
+
+        .resumo-centro { text-align: center; margin: 10px 0; font-size: 13px; }
+
+        /* Formulário de dados — Fase 3 */
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        .form-row.full { grid-template-columns: 1fr; }
+        .form-label { font-size: 11px; color: #555; margin-bottom: 2px; display: block; }
+        .form-input {
+            width: 100%; padding: 5px 6px; border: 1px solid #ccc;
+            border-radius: 3px; font-size: 12px;
+        }
+
+        @media print {
+            @page { size: A4; margin: 2cm; }
+            .no-print, .geo-nav { display: none !important; }
+            #listaSelecao { display: none !important; }
+            #map { width: 100%; flex: none; }
+            .flex-container { display: block; }
+            body { font-family: 'Times New Roman', serif; font-size: 11pt; }
+        }
+
+        /* ── NAV ── */
+        .geo-nav {
+            background: #1a73e8; color: #fff; height: 44px;
+            display: flex; align-items: center; padding: 0 16px; gap: 10px;
+            position: sticky; top: 0; z-index: 2100;
+            box-shadow: 0 2px 6px rgba(0,0,0,.15);
+        }
+        .geo-nav a.nav-home { display:flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-weight:700;font-size:14px;opacity:.9; }
+        .geo-nav a.nav-home:hover { opacity:1; }
+        .geo-nav .nav-sep { color:rgba(255,255,255,.4); }
+        .geo-nav .nav-current { font-size:13px;font-weight:600;opacity:.75; }
+        .geo-nav .nav-tools { margin-left:auto;display:flex;gap:5px; }
+        .geo-nav .nav-btn { background:rgba(255,255,255,.15);border:none;color:#fff;padding:4px 11px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block; }
+        .geo-nav .nav-btn:hover { background:rgba(255,255,255,.28); }
+        .geo-nav .nav-btn.active { background:rgba(255,255,255,.32); }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
+<!-- NAV -->
+<nav class="geo-nav">
+    <a href="index.html" class="nav-home">🌐 GeoSistema PRO</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-current">📄 Memorial Descritivo</span>
+    <div class="nav-tools">
+        <a href="rover.html" class="nav-btn">Rover</a>
+        <a href="geodescritivo_pro.html" class="nav-btn active">Memorial</a>
+        <a href="avaliacao_geo_pro.html" class="nav-btn">Avaliação</a>
+    </div>
+</nav>
+
+<!-- BARRA DE AÇÕES -->
 <div class="no-print">
-    <button onclick="window.location.href='index.html'" style="background:#6c757d; color:white;">← Voltar</button>
-    <button onclick="setTimeout(() => { window.print() }, 1000)" style="background:#007bff; color:white;">Gerar PDF Profissional</button>
-    <button onclick="exportarCSV_SIGEF()" style="background:#f39c12; color:white;">Planilha SIGEF (.csv)</button>
+    <div style="background: rgba(255,255,255,0.15); padding: 6px 10px; border-radius: 4px; font-size: 11px; color: white;">
+        <label style="cursor:pointer;">
+            📂 Importar:
+            <input type="file" accept=".csv,.html,.htm,.kml,.kmz,.txt,.gpx,.dxf"
+                   onchange="lerArquivo(this)" style="font-size: 11px; color: white; margin-left: 5px;">
+        </label>
+        <span id="statusImportacao" style="margin-left: 10px;"></span>
+    </div>
+
+    <button onclick="limpar()" style="background: #e67e00;">Limpar Seleção</button>
+    <button onclick="window.print()" style="background: #198754;">Gerar PDF</button>
+    <button onclick="enviarParaAvaliacao()" style="background: #7b1fa2;">Avaliação →</button>
 </div>
 
 <div class="container-relatorio">
-    <div class="capa-projeto">
-        <p style="text-align: right;">Gerado em: <span id="dataGeracao"></span></p>
-        <h1>RELATÓRIO TÉCNICO</h1>
-        <div class="detalhes">
+
+    <!-- CAPA -->
+    <div id="capa" style="min-height: 25cm; border: 2px solid black; text-align: center; display: flex; flex-direction: column; justify-content: space-between; padding: 20px;">
+        <div>
+            <h1 style="margin-top: 60px;">RELATÓRIO TÉCNICO</h1>
+            <h1 style="color: #1a73e8;">GEOSISTEMA PRO</h1>
+            <p style="color: #555;">Engenharia e Agrimensura | Georreferenciamento de Imóveis</p>
+        </div>
+        <div>
             <h2 id="capaImovel">NOME DA PROPRIEDADE</h2>
-            <p id="capaProprietario">Proprietário: Nome Completo</p>
-            <p>Georreferenciamento de Imóvel Rural</p>
+            <p id="capaMunicipio" style="color:#555;font-size:14px;"></p>
         </div>
-        <div style="margin-bottom: 2cm;">
-            <p><strong>Responsável Técnico:</strong> <span id="capaRT">Engenheiro Responsável</span></p>
-            <p>Sistema Geodésico SIRGAS 2000</p>
+        <div style="font-size: 13px; padding-bottom: 40px;">
+            <p>Responsável Técnico: <span id="capaRT"><b>EVERMONDO LUCAS</b></span></p>
+            <p>Datum: <span id="capaDatum"><b>SIRGAS 2000</b></span></p>
+            <p>Data: <span id="capaData"></span></p>
         </div>
     </div>
     <div class="page-break"></div>
 
-    <h3>1. MEMORIAL DESCRITIVO NARRATIVO</h3>
-    <div class="dados-imovel" style="border:1px solid #eee; padding:10px; margin-bottom:15px;">
-        <p><strong>IMÓVEL:</strong> <input type="text" id="inputImovel" placeholder="Nome do Imóvel"></p>
-        <p><strong>MATRÍCULA:</strong> <input type="text" placeholder="Nº da Matrícula"></p>
-        <p><strong>PROPRIETÁRIO:</strong> <input type="text" id="inputProp" placeholder="Nome do Proprietário"></p>
+    <!-- 1. PLANTA E SELEÇÃO -->
+    <h3>1. PLANTA E SELEÇÃO DE VÉRTICES</h3>
+    <p class="no-print" style="font-size: 12px; color: #555;">
+        Importe um arquivo acima e clique nos vértices à esquerda na ordem desejada para fechar a poligonal.
+    </p>
+    <div class="flex-container">
+        <div id="listaSelecao"><div id="botoesPontos"></div></div>
+        <div id="map"></div>
     </div>
-    <div id="printMemorial">Carregando memorial...</div>
+
+    <p class="resumo-centro">
+        <strong>Área:</strong> <span id="txtArea">0.00 m²</span> &nbsp;|&nbsp;
+        <strong>Perímetro:</strong> <span id="txtPeri">0.00 m</span>
+    </p>
+
     <div class="page-break"></div>
 
-    <h3>2. PLANTA DE SITUAÇÃO GEORREFERENCIADA</h3>
-    <div id="map"></div>
-    <p align="center">Área: <span id="areaFinal">0</span> m² | Perímetro: <span id="periFinal">0</span> m</p>
+    <!-- 2. MEMORIAL DESCRITIVO -->
+    <h3>2. MEMORIAL DESCRITIVO</h3>
+    <div id="printMemorial" style="text-align: justify; line-height: 1.8; font-size: 11pt;">
+        <p style="color: #999;">Selecione os vértices no mapa para gerar o texto automaticamente...</p>
+    </div>
+
     <div class="page-break"></div>
 
-    <h3>3. QUADRO DE VÉRTICES E CONFRONTANTES</h3>
+    <!-- 3. QUADRO DE COORDENADAS -->
+    <h3>3. QUADRO DE COORDENADAS (SIRGAS 2000)</h3>
     <table id="tabelaAltimetria">
         <thead>
-            <tr><th rowspan="2">Vértice</th><th colspan="2">Latitude (DMS/Dec)</th><th colspan="2">Longitude (DMS/Dec)</th><th rowspan="2">Alt (m)</th></tr>
-            <tr><th>DMS</th><th>Decimal</th><th>DMS</th><th>Decimal</th></tr>
+            <tr>
+                <th>Vértice</th>
+                <th>Latitude (DMS)</th>
+                <th>Longitude (DMS)</th>
+                <th>Altitude (m)</th>
+            </tr>
         </thead>
-        <tbody></tbody>
+        <tbody id="corpoAltimetria"></tbody>
     </table>
-    <p><strong>Edição de Confrontantes:</strong></p>
-    <table id="tabelaConfrontantes"><tbody></tbody></table>
-    <div class="page-break"></div>
+    <div style="height: 200px; margin-top: 20px;"><canvas id="graficoRelevo"></canvas></div>
 
-    <h3>4. PERFIL ALTIMÉTRICO E VALIDAÇÃO</h3>
-    <canvas id="graficoRelevo" style="max-height: 300px; margin-bottom: 30px;"></canvas>
-    
-    <table id="tabelaQualidade">
-        <thead><tr><th>Vértice</th><th>Solução</th><th>RMS H (m)</th><th>RMS V (m)</th></tr></thead>
-        <tbody></tbody>
+    <!-- 4. CONFRONTANTES -->
+    <h3>4. CONFRONTANTES</h3>
+    <table id="tabelaConfrontantes">
+        <thead>
+            <tr><th>Trecho</th><th>Nome do Confrontante / Vizinho</th></tr>
+        </thead>
+        <tbody id="corpoConfrontantes"></tbody>
     </table>
 
-    <div class="bloco-final" style="text-align:center; margin-top:50px;">
-        <div style="border-top: 1px solid #000; width: 300px; margin: 0 auto 5px auto;"></div>
-        <input type="text" id="inputRT" placeholder="Seu Nome Completo" style="text-align:center; width:80%; font-weight:bold;"><br>
-        <input type="text" placeholder="CREA/CAU/CFT" style="text-align:center; width:40%;"><br>
-        <input type="text" placeholder="ART/RRT Nº" style="text-align:center; width:40%;">
+    <!-- DADOS DO IMÓVEL — Fase 3: campos ampliados -->
+    <div class="no-print" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; border: 1px solid #ddd;">
+        <strong style="font-size: 13px;">Dados para o Memorial:</strong><br><br>
+
+        <div class="form-row full">
+            <div>
+                <span class="form-label">Proprietário *</span>
+                <input type="text" id="nomeProprietario" class="form-input" placeholder="Nome completo do proprietário">
+            </div>
+        </div>
+        <div class="form-row">
+            <div>
+                <span class="form-label">Matrícula *</span>
+                <input type="text" id="matriculaImovel" class="form-input" placeholder="Nº da matrícula">
+            </div>
+            <div>
+                <span class="form-label">Datum</span>
+                <select id="nomeDatum" class="form-input">
+                    <option value="SIRGAS 2000" selected>SIRGAS 2000</option>
+                    <option value="SAD 69">SAD 69</option>
+                    <option value="WGS 84">WGS 84</option>
+                    <option value="Córrego Alegre">Córrego Alegre</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div>
+                <span class="form-label">Município</span>
+                <input type="text" id="nomeMunicipio" class="form-input" placeholder="Município">
+            </div>
+            <div>
+                <span class="form-label">Comarca</span>
+                <input type="text" id="nomeComarca" class="form-input" placeholder="Comarca">
+            </div>
+        </div>
+        <div class="form-row full">
+            <div>
+                <span class="form-label">Cartório de Registro de Imóveis</span>
+                <input type="text" id="nomeCartorio" class="form-input" placeholder="Nome do cartório">
+            </div>
+        </div>
+        <div class="form-row">
+            <div>
+                <span class="form-label">Responsável Técnico</span>
+                <input type="text" id="nomeRT" class="form-input" value="EVERMONDO LUCAS">
+            </div>
+            <div>
+                <span class="form-label">CREA / CFT</span>
+                <input type="text" id="numCREA" class="form-input" placeholder="Nº do registro">
+            </div>
+        </div>
+
+        <button onclick="prepararImpressao()" style="background: #198754; color: white; width: 100%; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 10px;">
+            Gerar Memorial e Imprimir
+        </button>
     </div>
+
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="geomemorial_pro.js"></script>
+<script>
+    document.getElementById('capaData').textContent = new Date().toLocaleDateString('pt-BR');
+
+    // Sincroniza campos de capa com os inputs ao digitar
+    ['nomeRT','nomeDatum','nomeMunicipio'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', () => {
+            if (id === 'nomeRT')      document.getElementById('capaRT').textContent    = el.value;
+            if (id === 'nomeDatum')   document.getElementById('capaDatum').textContent = el.value;
+            if (id === 'nomeMunicipio') document.getElementById('capaMunicipio').textContent = el.value ? 'Município de ' + el.value : '';
+        });
+    });
+    document.getElementById('matriculaImovel')?.addEventListener('input', e => {
+        document.getElementById('capaImovel').textContent = e.target.value || 'NOME DA PROPRIEDADE';
+    });
+
+    // Enviar vértices selecionados para a Avaliação Imobiliária
+    function enviarParaAvaliacao() {
+        if (typeof selecionados === 'undefined' || !selecionados.length) {
+            alert('Selecione pelo menos 3 vértices da poligonal antes de enviar.');
+            return;
+        }
+        if (selecionados.length < 3) {
+            alert('Selecione pelo menos 3 vértices para formar a poligonal.');
+            return;
+        }
+        try {
+            sessionStorage.setItem('geo_vertices_avaliacao', JSON.stringify(selecionados));
+            window.location.href = 'avaliacao_geo_pro.html';
+        } catch(e) {
+            alert('Não foi possível transferir os dados.\nAbra a Avaliação e importe o arquivo diretamente.');
+        }
+    }
+</script>
 </body>
 </html>

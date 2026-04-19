@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GeoSistema PRO | Rover GNSS</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a73e8">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        /* ── NAV ── */
+        .geo-nav { background: #1a73e8; color: #fff; height: 44px; display: flex; align-items: center; padding: 0 16px; gap: 10px; flex-shrink: 0; z-index: 3000; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+        .geo-nav a.nav-home { display:flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-weight:700;font-size:14px;opacity:.9; }
+        .geo-nav a.nav-home:hover { opacity:1; }
+        .geo-nav .nav-sep { color:rgba(255,255,255,.4); }
+        .geo-nav .nav-current { font-size:13px;font-weight:600;opacity:.75; }
+        .geo-nav .nav-tools { margin-left:auto;display:flex;gap:5px; }
+        .geo-nav .nav-btn { background:rgba(255,255,255,.15);border:none;color:#fff;padding:4px 11px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block; }
+        .geo-nav .nav-btn:hover { background:rgba(255,255,255,.28); }
+        .geo-nav .nav-btn.active { background:rgba(255,255,255,.32); }
+
+        /* ── LAYOUT — replica estrutura do geodescritivo_pro ── */
+        .main-container { display: flex; flex: 1; min-height: 0; }
+
+        #sidebar {
+            width: 320px; background: white; border-right: 1px solid #ccc;
+            display: flex; flex-direction: column; padding: 12px;
+            flex-shrink: 0; overflow-y: auto;
+        }
+
+        #map-container { flex: 1; position: relative; background: #e5e3df; display: flex; flex-direction: column; }
+        #map { flex: 1; width: 100%; height: 100%; z-index: 1; }
+
+        .section-title { font-size: 12px; font-weight: bold; margin: 10px 0 5px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 3px; }
+
+        .zona-importacao { background: #e8f0fe; padding: 10px; border-radius: 6px; border: 1px dashed #1a73e8; margin-bottom: 10px; }
+        .zona-importacao label { font-size: 11px; font-weight: bold; color: #1a73e8; display: block; margin-bottom: 4px; }
+
+        #listaPontos { height: 160px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; margin-bottom: 6px; }
+        #containerVizinhos { height: 110px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; background: #fafafa; }
+
+        .ponto-item { padding: 6px 8px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 12px; transition: 0.15s; }
+        .ponto-item:hover { background: #f8f9fa; }
+        .ponto-item.active { background: #d1e7dd; border-left: 4px solid #198754; font-weight: bold; }
+
+        .resumo-footer { background: #fff3cd; padding: 8px 10px; border-radius: 4px; font-size: 12px; margin-top: 6px; border: 1px solid #ffeeba; }
+
+        /* Botões — override do geomemorial_pro.js que injeta estilos */
+        button.btn-sidebar { width: 100%; padding: 8px; margin-top: 5px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .btn-clear  { background: #e9ecef !important; color: #333 !important; }
+        .btn-print  { background: #198754 !important; color: white !important; }
+        .btn-aval   { background: #e67e00 !important; color: white !important; width: 100%; padding: 8px; margin-top: 5px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
+
+        /* Formulário de dados */
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+        .form-row.full { grid-template-columns: 1fr; }
+        .form-label { font-size: 10px; color: #666; margin-bottom: 1px; display: block; }
+        .form-input { width: 100%; padding: 5px 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; outline: none; }
+        .form-input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,.15); }
+
+        #statusImportacao { font-size: 11px; margin-top: 5px; min-height: 16px; }
+
+        /* Tabela confrontantes */
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th { background: #f1f1f1; text-align: left; padding: 4px; font-size: 10px; }
+        td { padding: 2px; border-bottom: 1px solid #eee; }
+        input.input-vizinho { width: 100%; border: 1px solid #ddd; padding: 3px; font-size: 11px; }
+
+        /* Área de impressão */
+        #areaImpressao { display: none; }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            #btnToggleSidebar { display: flex !important; }
+            #sidebar { position: fixed; top: 44px; left: -340px; height: calc(100vh - 44px); z-index: 2500; transition: left 0.3s; box-shadow: 4px 0 12px rgba(0,0,0,.3); }
+            #sidebar.sidebar-open { left: 0 !important; }
+        }
+        #btnToggleSidebar { display: none; position: fixed; top: 50px; left: 10px; z-index: 3000; background: #1a73e8; color: white; border: none; border-radius: 6px; width: 38px; height: 38px; font-size: 18px; cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.4); padding: 0; margin: 0; width: 38px; }
+
+        @media print {
+            @page { size: A4; margin: 2cm; }
+            .geo-nav, #btnToggleSidebar { display: none !important; }
+            body { height: auto; overflow: visible; }
+            .main-container { display: block; }
+            #sidebar { display: none !important; }
+            #map-container { height: 350px; display: block; }
+            #map { height: 350px !important; border: 1px solid #000; }
+            #areaImpressao { display: block !important; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="geo-nav">
+    <a href="index.html" class="nav-home">🌐 GeoSistema PRO</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-current">📡 Rover GNSS</span>
+    <div class="nav-tools">
+        <a href="rover.html" class="nav-btn active">Rover</a>
+        <a href="geodescritivo_pro.html" class="nav-btn">Memorial</a>
+        <a href="avaliacao_geo_pro.html" class="nav-btn">Avaliação</a>
+    </div>
+</nav>
+
+<button id="btnToggleSidebar" onclick="document.getElementById('sidebar').classList.toggle('sidebar-open')">☰</button>
+
+<div class="main-container">
+
+    <!-- SIDEBAR — IDs que o geomemorial_pro.js usa -->
+    <div id="sidebar">
+
+        <!-- IMPORTAÇÃO -->
+        <div class="zona-importacao">
+            <label>Importar arquivo de vértices</label>
+            <input type="file" id="fileInput" accept=".csv,.html,.htm,.kml,.kmz,.txt,.gpx,.dxf"
+                   onchange="lerArquivo(this)" style="font-size:11px;width:100%;">
+            <div id="statusImportacao"></div>
+        </div>
+
+        <!-- DADOS DO IMÓVEL -->
+        <div class="section-title">Dados do Imóvel</div>
+
+        <div class="form-row full">
+            <div>
+                <span class="form-label">Proprietário *</span>
+                <input type="text" id="nomeProprietario" class="form-input" placeholder="Nome completo">
+            </div>
+        </div>
+        <div class="form-row">
+            <div>
+                <span class="form-label">Matrícula *</span>
+                <input type="text" id="matriculaImovel" class="form-input" placeholder="Nº matrícula">
+            </div>
+            <div>
+                <span class="form-label">Datum</span>
+                <select id="nomeDatum" class="form-input">
+                    <option value="SIRGAS 2000" selected>SIRGAS 2000</option>
+                    <option value="SAD 69">SAD 69</option>
+                    <option value="WGS 84">WGS 84</option>
+                    <option value="Córrego Alegre">Córrego Alegre</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div>
+                <span class="form-label">Município</span>
+                <input type="text" id="nomeMunicipio" class="form-input" placeholder="Município">
+            </div>
+            <div>
+                <span class="form-label">Comarca</span>
+                <input type="text" id="nomeComarca" class="form-input" placeholder="Comarca">
+            </div>
+        </div>
+        <div class="form-row full">
+            <div>
+                <span class="form-label">Cartório / Registro</span>
+                <input type="text" id="nomeCartorio" class="form-input" placeholder="Cartório de Registro de Imóveis">
+            </div>
+        </div>
+        <div class="form-row">
+            <div>
+                <span class="form-label">Resp. Técnico</span>
+                <input type="text" id="nomeRT" class="form-input" value="EVERMONDO LUCAS">
+            </div>
+            <div>
+                <span class="form-label">CREA/CFT</span>
+                <input type="text" id="numCREA" class="form-input" placeholder="Nº registro">
+            </div>
+        </div>
+
+        <!-- VÉRTICES — geomemorial_pro.js renderiza aqui -->
+        <div class="section-title">Vértices Disponíveis</div>
+        <div id="listaPontos"></div>
+        <!-- âncora para a lista ordenável gerada pelo JS -->
+        <div id="anchorOrdenavel"></div>
+
+        <!-- CONFRONTANTES — geomemorial_pro.js preenche tbody -->
+        <div class="section-title">Confrontantes</div>
+        <div id="containerVizinhos">
+            <table>
+                <thead><tr><th>Trecho</th><th>Confrontante</th></tr></thead>
+                <tbody id="corpoConfrontantes"></tbody>
+            </table>
+        </div>
+
+        <!-- RESUMO — geomemorial_pro.js atualiza txtArea e txtPeri -->
+        <div class="resumo-footer">
+            <strong>Área:</strong> <span id="txtArea">0.00 m²</span><br>
+            <strong>Perímetro:</strong> <span id="txtPeri">0.00 m</span>
+        </div>
+
+        <button class="btn-clear" onclick="limparSelecao()" style="width:100%;padding:8px;margin-top:5px;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px">Limpar Seleção</button>
+        <button class="btn-print" onclick="prepararImpressao()" style="width:100%;padding:8px;margin-top:5px;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px;background:#198754;color:white">Imprimir Memorial</button>
+        <button onclick="enviarParaAvaliacao()" style="width:100%;padding:8px;margin-top:5px;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px;background:#e67e00;color:white">Enviar para Avaliação →</button>
+
+    </div><!-- /sidebar -->
+
+    <!-- MAPA — geomemorial_pro.js usa id="map" -->
+    <div id="map-container">
+        <div id="map"></div>
+    </div>
+
+</div><!-- /main-container -->
+
+<!-- ÁREA DE IMPRESSÃO — geomemorial_pro.js usa textoNarrativo -->
+<div id="areaImpressao">
+    <div id="textoNarrativo"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="geomemorial_pro.js"></script>
+<script>
+// ── Enviar vértices selecionados para a Avaliação Imobiliária ──
+function enviarParaAvaliacao() {
+    if (typeof selecionados === 'undefined' || !selecionados.length) {
+        alert('Selecione pelo menos 3 vértices da poligonal antes de enviar.\n\nClique nos vértices na lista para selecioná-los.');
+        return;
+    }
+    if (selecionados.length < 3) {
+        alert('Selecione pelo menos 3 vértices para formar a poligonal.');
+        return;
+    }
+    try {
+        sessionStorage.setItem('geo_vertices_avaliacao', JSON.stringify(selecionados));
+        window.location.href = 'avaliacao_geo_pro.html';
+    } catch(e) {
+        alert('Não foi possível transferir os dados.\nAbra a Avaliação e importe o arquivo diretamente.');
+    }
+}
+</script>
+</body>
+</html>

@@ -1,63 +1,287 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoSistema PRO - Importação Rover</title>
-     <!-- PWA -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#007bff">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoSistema PRO</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a73e8">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;min-height:100vh;display:flex;flex-direction:column}
 
-    <!-- iPhone -->
-    <link rel="apple-touch-icon" href="icon-192.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+/* ── HEADER ── */
+header{background:#1a73e8;color:#fff;padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:34px;height:34px;background:rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.logo-text{font-size:18px;font-weight:700;letter-spacing:.3px}
+.logo-text small{font-weight:400;font-size:11px;opacity:.8;margin-left:6px}
+.header-right{display:flex;align-items:center;gap:10px}
+.version-badge{background:rgba(255,255,255,.18);padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f4f7f6; }
-        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        #map { height: 450px; margin-top: 20px; border: 1px solid #ddd; border-radius: 8px; z-index: 1; }
-        .controles { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; background: #e9ecef; padding: 15px; border-radius: 8px; }
-        button { padding: 12px 18px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; color: white; transition: 0.2s; }
-        .btn-import { background: #007bff; } .btn-poly { background: #28a745; } .btn-nav { background: #17a2b8; }
-        .resultados { display: flex; gap: 25px; margin: 15px 0; padding: 12px; background: #d4edda; border-left: 4px solid #28a745; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
-        th, td { border: 1px solid #eee; padding: 10px; text-align: center; font-size: 13px; }
-        th { background: #007bff; color: white; }
-        .label-medida { background: white; border: 1px solid red; border-radius: 3px; padding: 2px 4px; font-size: 11px; font-weight: bold; color: red; white-space: nowrap; }
-    </style>
+/* ── HERO ── */
+.hero{background:linear-gradient(135deg,#1a73e8 0%,#0d47a1 100%);color:#fff;padding:40px 24px 48px;text-align:center}
+.hero h1{font-size:26px;font-weight:700;margin-bottom:8px;letter-spacing:.3px}
+.hero p{font-size:14px;opacity:.85;max-width:560px;margin:0 auto;line-height:1.6}
+.hero-badges{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.hero-badge{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);padding:4px 14px;border-radius:14px;font-size:12px;font-weight:600}
+
+/* ── GRID DE FERRAMENTAS ── */
+.tools-wrap{flex:1;padding:28px 24px 40px;max-width:1100px;margin:0 auto;width:100%}
+.section-title{font-size:12px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid #e0e0e0}
+.tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:32px}
+
+/* ── CARD DE FERRAMENTA ── */
+.tool-card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:0;overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .15s;text-decoration:none;display:flex;flex-direction:column}
+.tool-card:hover{box-shadow:0 6px 20px rgba(0,0,0,.1);transform:translateY(-2px)}
+.tool-card:active{transform:translateY(0)}
+.card-color-bar{height:5px;width:100%}
+.card-body{padding:18px 20px;flex:1;display:flex;flex-direction:column;gap:8px}
+.card-icon-row{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.card-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.card-name{font-size:15px;font-weight:700;color:#1a1a1a}
+.card-desc{font-size:12px;color:#666;line-height:1.6;flex:1}
+.card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0}
+.card-tags{display:flex;gap:5px;flex-wrap:wrap}
+.tag{background:#f0f2f5;color:#555;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.card-arrow{color:#bbb;font-size:16px;transition:color .15s}
+.tool-card:hover .card-arrow{color:#1a73e8}
+
+/* ── CORES POR FERRAMENTA ── */
+.blue .card-color-bar{background:#1a73e8}
+.blue .card-icon{background:#e8f0fe;color:#1a73e8}
+.green .card-color-bar{background:#198754}
+.green .card-icon{background:#e8f5e9;color:#198754}
+.orange .card-color-bar{background:#e67e00}
+.orange .card-icon{background:#fff3e0;color:#e67e00}
+.purple .card-color-bar{background:#7b1fa2}
+.purple .card-icon{background:#f3e5f5;color:#7b1fa2}
+.teal .card-color-bar{background:#00796b}
+.teal .card-icon{background:#e0f2f1;color:#00796b}
+
+/* ── RODAPÉ DE STATUS ── */
+.status-bar{background:#fff;border-top:1px solid #e0e0e0;padding:10px 24px;display:flex;gap:20px;font-size:11px;color:#888;flex-wrap:wrap}
+.status-item{display:flex;align-items:center;gap:5px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#4caf50}
+.status-dot.warn{background:#ffc107}
+
+/* ── MODAL DE INFO ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.active{display:flex}
+.modal{background:#fff;border-radius:12px;max-width:480px;width:100%;padding:28px;position:relative}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:8px;color:#1a1a1a}
+.modal p{font-size:13px;color:#555;line-height:1.7;margin-bottom:12px}
+.modal .shortcut-list{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.modal .shortcut{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f8f9fa;border-radius:6px;font-size:12px}
+.modal .shortcut strong{color:#1a1a1a;min-width:140px}
+.modal .shortcut span{color:#666}
+.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:#aaa;line-height:1}
+.modal-close:hover{color:#333}
+.modal-btn{display:inline-block;padding:9px 20px;background:#1a73e8;color:#fff;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;border:none;cursor:pointer}
+
+/* ── RESPONSIVO ── */
+@media(max-width:600px){
+  .hero h1{font-size:20px}
+  .tools-grid{grid-template-columns:1fr}
+  .hero-badges{display:none}
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h2>Geoprocessamento Rover GNSS</h2>
-        <div class="controles">
-            <input type="file" id="arquivoGNSS">
-            <button onclick="importarDados()" class="btn-import">1. Carregar Rover</button>
-            <button onclick="gerarPoligonal()" class="btn-poly">2. Desenhar Poligonal</button>
-            <button onclick="enviarParaMemorial()" class="btn-nav">3. Relatório Completo →</button>
-        </div>
-        <div class="resultados">
-            <span>Área: <span id="area">0</span> m²</span>
-            <span>Perímetro: <span id="perimetro">0</span> m</span>
-        </div>
-        <div id="map"></div>
-        <table>
-            <thead>
-                <tr>
-                    <th><input type="checkbox" onclick="selecionarTodos(this)"></th>
-                    <th>Ponto</th>
-                    <th>Lat (DMS)</th>
-                    <th>Lon (DMS)</th>
-                    <th>Elev (m)</th>
-                    <th>Precisão H (m)</th>
-                    <th>Solução</th>
-                </tr>
-            </thead>
-            <tbody id="corpoTabela"></tbody>
-        </table>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌐</div>
+    <div>
+      <div class="logo-text">GeoSistema PRO <small>| Suite completa</small></div>
     </div>
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="script.js"></script>
+  </div>
+  <div class="header-right">
+    <span class="version-badge">v4.0</span>
+    <button onclick="document.getElementById('modal-sobre').classList.add('active')"
+            style="background:rgba(255,255,255,.18);border:none;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
+      Sobre
+    </button>
+  </div>
+</header>
+
+<div class="hero">
+  <h1>Georreferenciamento e Avaliação Imobiliária</h1>
+  <p>Suite integrada para coleta GNSS, processamento de poligonais, memorial descritivo e avaliação imobiliária conforme NBR 14.653.</p>
+  <div class="hero-badges">
+    <span class="hero-badge">SIRGAS 2000</span>
+    <span class="hero-badge">NBR 14.653</span>
+    <span class="hero-badge">KML · KMZ · CSV</span>
+    <span class="hero-badge">Offline / PWA</span>
+    <span class="hero-badge">Memorial para cartório</span>
+  </div>
+</div>
+
+<div class="tools-wrap">
+
+  <div class="section-title">Ferramentas principais</div>
+  <div class="tools-grid">
+
+    <!-- 1. Geoprocessamento Rover -->
+    <a href="rover.html" class="tool-card blue">
+      <div class="card-color-bar"></div>
+      <div class="card-body">
+        <div class="card-icon-row">
+          <div class="card-icon">📡</div>
+          <div class="card-name">Geoprocessamento Rover GNSS</div>
+        </div>
+        <div class="card-desc">
+          Importe arquivos do receptor GNSS, visualize pontos no mapa, gere a poligonal com área e perímetro automáticos, e exporte KML ou CSV.
+        </div>
+        <div class="card-footer">
+          <div class="card-tags">
+            <span class="tag">Rover</span>
+            <span class="tag">Poligonal</span>
+            <span class="tag">KML</span>
+          </div>
+          <span class="card-arrow">→</span>
+        </div>
+      </div>
+    </a>
+
+    <!-- 2. Memorial Descritivo -->
+    <a href="geodescritivo_pro.html" class="tool-card green">
+      <div class="card-color-bar"></div>
+      <div class="card-body">
+        <div class="card-icon-row">
+          <div class="card-icon">📄</div>
+          <div class="card-name">Memorial Descritivo</div>
+        </div>
+        <div class="card-desc">
+          Gere o memorial descritivo completo para cartório — rumos, distâncias, azimutes, quadro de coordenadas, altimetria e assinaturas.
+        </div>
+        <div class="card-footer">
+          <div class="card-tags">
+            <span class="tag">Cartório</span>
+            <span class="tag">SIRGAS 2000</span>
+            <span class="tag">PDF</span>
+          </div>
+          <span class="card-arrow">→</span>
+        </div>
+      </div>
+    </a>
+
+    <!-- 3. Avaliação Imobiliária -->
+    <a href="avaliacao_geo_pro.html" class="tool-card orange">
+      <div class="card-color-bar"></div>
+      <div class="card-body">
+        <div class="card-icon-row">
+          <div class="card-icon">🏡</div>
+          <div class="card-name">Avaliação Imobiliária</div>
+        </div>
+        <div class="card-desc">
+          Avalie imóveis pelo Método Comparativo Direto e Método Evolutivo. Importa poligonal GNSS, marca amostras no mapa e gera laudo completo NBR 14.653.
+        </div>
+        <div class="card-footer">
+          <div class="card-tags">
+            <span class="tag">NBR 14.653</span>
+            <span class="tag">Comparativo</span>
+            <span class="tag">Evolutivo</span>
+            <span class="tag">Laudo PDF</span>
+          </div>
+          <span class="card-arrow">→</span>
+        </div>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="section-title">Fluxo de trabalho recomendado</div>
+  <div style="background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:20px;margin-bottom:32px">
+    <div style="display:flex;gap:0;flex-wrap:wrap;align-items:stretch">
+
+      <div style="flex:1;min-width:180px;padding:14px 18px;border-right:1px solid #f0f0f0;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;background:#e8f0fe;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#1a73e8;flex-shrink:0">1</div>
+          <strong style="font-size:13px;color:#1a1a1a">Coletar em campo</strong>
+        </div>
+        <p style="font-size:12px;color:#666;line-height:1.6;margin-left:36px">Use o receptor GNSS Rover para coletar os vértices do terreno em campo com precisão.</p>
+        <a href="rover.html" style="margin-left:36px;font-size:12px;color:#1a73e8;font-weight:600;text-decoration:none">Abrir Rover GNSS →</a>
+      </div>
+
+      <div style="flex:1;min-width:180px;padding:14px 18px;border-right:1px solid #f0f0f0;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;background:#e8f5e9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#198754;flex-shrink:0">2</div>
+          <strong style="font-size:13px;color:#1a1a1a">Gerar memorial</strong>
+        </div>
+        <p style="font-size:12px;color:#666;line-height:1.6;margin-left:36px">Importe o arquivo do Rover, selecione os vértices e gere o memorial descritivo para cartório.</p>
+        <a href="geodescritivo_pro.html" style="margin-left:36px;font-size:12px;color:#198754;font-weight:600;text-decoration:none">Abrir Memorial →</a>
+      </div>
+
+      <div style="flex:1;min-width:180px;padding:14px 18px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;background:#fff3e0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#e67e00;flex-shrink:0">3</div>
+          <strong style="font-size:13px;color:#1a1a1a">Avaliar o imóvel</strong>
+        </div>
+        <p style="font-size:12px;color:#666;line-height:1.6;margin-left:36px">Importe o KML ou CSV gerado, marque amostras no mapa e produza o laudo de avaliação.</p>
+        <a href="avaliacao_geo_pro.html" style="margin-left:36px;font-size:12px;color:#e67e00;font-weight:600;text-decoration:none">Abrir Avaliação →</a>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-title">Formatos compatíveis</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:32px">
+    <div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px 14px">
+      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:3px">KML / KMZ</div>
+      <div style="font-size:11px;color:#777">Google Earth, QGIS, receivers GNSS</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px 14px">
+      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:3px">CSV / TXT</div>
+      <div style="font-size:11px;color:#777">Geográfico (lat/lon) ou UTM com fuso</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px 14px">
+      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:3px">GeoJSON</div>
+      <div style="font-size:11px;color:#777">Polígonos, linhas e pontos</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px 14px">
+      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:3px">HTML</div>
+      <div style="font-size:11px;color:#777">Relatórios do próprio GeoSistema</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px 14px">
+      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:3px">UTM → Geo</div>
+      <div style="font-size:11px;color:#777">Conversão automática SIRGAS 2000</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="status-bar">
+  <div class="status-item"><div class="status-dot"></div>GeoSistema PRO v4.0</div>
+  <div class="status-item"><div class="status-dot"></div>EVERMONDO LUCAS — CREA/CFT</div>
+  <div class="status-item"><div class="status-dot warn"></div>PWA — instalável no celular</div>
+  <div class="status-item">Datum: SIRGAS 2000 · NBR 14.653</div>
+</div>
+
+<!-- MODAL SOBRE -->
+<div id="modal-sobre" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('active')">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('modal-sobre').classList.remove('active')">✕</button>
+    <h3>GeoSistema PRO — Suite v4.0</h3>
+    <p>
+      Sistema integrado de georreferenciamento e avaliação imobiliária desenvolvido para o
+      <strong>Corpo de Bombeiros Militar da Bahia (CBMBA)</strong> e trabalhos técnicos de campo.
+    </p>
+    <div class="shortcut-list">
+      <div class="shortcut"><strong>Geoprocessamento Rover</strong><span>Importação e poligonal GNSS</span></div>
+      <div class="shortcut"><strong>Memorial Descritivo</strong><span>Relatório técnico para cartório</span></div>
+      <div class="shortcut"><strong>Avaliação Imobiliária</strong><span>Laudo NBR 14.653 completo</span></div>
+    </div>
+    <p style="font-size:11px;color:#aaa;margin-bottom:16px">
+      Responsável técnico: <strong style="color:#555">EVERMONDO LUCAS</strong> · CREA/CFT: 3000070598BA<br>
+      Datum padrão: SIRGAS 2000 · Projeção: UTM fuso 24S
+    </p>
+    <button class="modal-btn" onclick="document.getElementById('modal-sobre').classList.remove('active')">Fechar</button>
+  </div>
+</div>
+
 </body>
 </html>

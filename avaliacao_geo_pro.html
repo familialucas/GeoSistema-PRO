@@ -1,0 +1,2287 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Avaliação Imobiliária GEO | NBR 14.653</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+/* ── NAV ── */
+.geo-nav{background:#1a73e8;color:#fff;height:42px;display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;font-size:13px}
+.geo-nav a.nav-home{display:flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-weight:700;opacity:.9}
+.geo-nav a.nav-home:hover{opacity:1}
+.geo-nav .nav-sep{color:rgba(255,255,255,.4)}
+.geo-nav .nav-current{opacity:.7;font-weight:600}
+.geo-nav .nav-tools{margin-left:auto;display:flex;gap:5px}
+.geo-nav .nav-btn{background:rgba(255,255,255,.15);border:none;color:#fff;padding:4px 11px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.geo-nav .nav-btn:hover{background:rgba(255,255,255,.28)}
+.geo-nav{position:fixed;top:0;left:0;right:0;z-index:9999}
+/* ── RESET & BASE ── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-top:42px}
+
+/* ── HEADER ── */
+header{background:#1a73e8;color:#fff;padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:100}
+.header-title{font-size:17px;font-weight:700;letter-spacing:.3px}
+.header-title small{font-weight:400;font-size:11px;opacity:.8;margin-left:6px}
+.header-badges{display:flex;gap:8px;align-items:center}
+.hbadge{background:rgba(255,255,255,.18);padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600}
+.hbadge.verde{background:rgba(40,200,110,.35)}
+
+/* ── TABS PRINCIPAIS ── */
+.main-tabs{background:#fff;border-bottom:1px solid #ddd;display:flex;flex-shrink:0;padding:0 20px}
+.main-tab{padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:transparent;color:#777;border-bottom:3px solid transparent;transition:.15s}
+.main-tab.active{color:#1a73e8;border-bottom-color:#1a73e8}
+.main-tab:hover{color:#1a73e8}
+
+/* ── LAYOUT PRINCIPAL ── */
+.workspace{display:flex;flex:1;min-height:0;overflow:hidden}
+
+/* ── PAINEL LATERAL ── */
+#painel{width:340px;background:#fff;border-right:1px solid #ddd;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.painel-sec{padding:14px 16px;border-bottom:1px solid #eee}
+.sec-title{font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.sec-title svg{opacity:.6}
+
+/* ── MAPA ── */
+#map-wrap{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+#map-toolbar{background:#fff;border-bottom:1px solid #ddd;padding:8px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0;height:46px}
+#map{flex:1;min-height:0;width:100%}
+
+/* ── CONTEÚDO DAS ABAS ── */
+.aba-content{display:none;flex:1;min-height:0;overflow:hidden}
+.aba-content.active{display:flex}
+
+/* ── ABA TERRENO: layout mapa+painel ── */
+#aba-terreno{flex-direction:row}
+
+/* ── ABAS DE AVALIAÇÃO: scroll vertical próprio ── */
+#aba-comp,#aba-evol,#aba-laudo{flex-direction:column;overflow-y:auto;overflow-x:hidden}
+.aba-inner{padding:18px 24px;width:100%;max-width:900px;flex-shrink:0}
+
+/* ── FORMS ── */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.form-row.c3{grid-template-columns:1fr 1fr 1fr}
+.form-row.c1{grid-template-columns:1fr}
+.flabel{font-size:11px;color:#666;margin-bottom:3px;display:block}
+.finput{width:100%;height:34px;padding:0 9px;border:1px solid #ddd;border-radius:4px;font-size:13px;outline:none;background:#fff;color:#222}
+.finput:focus{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.12)}
+select.finput{cursor:pointer}
+
+/* ── BOTÕES ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 14px;height:34px;border:none;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-blue{background:#1a73e8;color:#fff}
+.btn-blue:hover{background:#1557b0}
+.btn-green{background:#198754;color:#fff}
+.btn-green:hover{background:#146c43}
+.btn-orange{background:#e67e00;color:#fff}
+.btn-orange:hover{background:#c46e00}
+.btn-red{background:#dc3545;color:#fff}
+.btn-red:hover{background:#b02a37}
+.btn-ghost{background:#e9ecef;color:#333}
+.btn-ghost:hover{background:#dee2e6}
+.btn-sm{height:28px;padding:0 10px;font-size:12px}
+
+/* ── ZONA DE UPLOAD ── */
+.upload-zone{border:2px dashed #1a73e8;border-radius:6px;padding:16px;text-align:center;cursor:pointer;background:#e8f0fe;transition:.15s}
+.upload-zone:hover{background:#d2e3fc}
+.upload-zone .uz-title{font-size:13px;font-weight:700;color:#1a73e8;margin-bottom:4px}
+.upload-zone .uz-sub{font-size:11px;color:#555}
+
+/* ── LISTA DE VÉRTICES ── */
+#lista-vertices{max-height:180px;overflow-y:auto;border:1px solid #eee;border-radius:4px;margin-top:8px}
+.v-item{display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid #f0f0f0;font-size:12px;cursor:pointer;transition:.1s}
+.v-item:hover{background:#f8f9fa}
+.v-item.active{background:#d1e7dd;font-weight:600}
+.v-dot{width:14px;height:14px;border-radius:50%;border:2px solid #1a73e8;background:#fff;flex-shrink:0}
+.v-item.active .v-dot{background:#1a73e8}
+
+/* ── MÉTRICAS ── */
+.metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.metric-card{background:#f8f9fa;border:1px solid #eee;border-radius:6px;padding:10px;text-align:center}
+.metric-card .mc-lbl{font-size:10px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.metric-card .mc-val{font-size:18px;font-weight:700;color:#222}
+.metric-card .mc-sub{font-size:10px;color:#aaa;margin-top:2px}
+.metric-card.destaque{background:#e8f5e9;border-color:#a5d6a7}
+.metric-card.destaque .mc-val{color:#1b5e20}
+
+/* ── CARD DE SEÇÃO ── */
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:14px}
+.card-title{font-size:12px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;border-bottom:1px solid #f0f0f0;padding-bottom:8px}
+
+/* ── TABELA DE ELEMENTOS ── */
+.elem-table-wrap{overflow-x:auto;margin-top:8px;border-radius:6px;border:1px solid #e0e0e0}
+.elem-table-wrap::-webkit-scrollbar{height:5px}
+.elem-table-wrap::-webkit-scrollbar-track{background:#f0f0f0;border-radius:3px}
+.elem-table-wrap::-webkit-scrollbar-thumb{background:#bbb;border-radius:3px}
+.elem-table{width:100%;border-collapse:collapse;font-size:12px}
+.elem-table th{padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;background:#f8f9fa;border-bottom:2px solid #dee2e6;color:#555;white-space:nowrap}
+.elem-table td{padding:5px 6px;border-bottom:1px solid #f0f0f0;color:#222}
+.elem-table tr:last-child td{border-bottom:none}
+.elem-table tr:hover td{background:#fafafa}
+.elem-table input{width:100%;height:26px;padding:0 5px;border:1px solid #ddd;border-radius:3px;font-size:12px;background:#fff}
+.elem-table input:focus{border-color:#1a73e8;outline:none;background:#f0f7ff}
+
+/* ── RESULTADO ── */
+.resultado-box{background:#e8f5e9;border:2px solid #4caf50;border-radius:8px;padding:20px;text-align:center;margin-top:12px}
+.resultado-box .rb-label{font-size:11px;font-weight:700;color:#2e7d32;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+.resultado-box .rb-valor{font-size:28px;font-weight:700;color:#1b5e20}
+.resultado-box .rb-info{font-size:12px;color:#388e3c;margin-top:6px}
+
+/* ── RESULTADO LAUDO ── */
+.laudo-table{width:100%;border-collapse:collapse;font-size:13px}
+.laudo-table th{padding:8px 12px;text-align:left;font-size:11px;font-weight:700;background:#f8f9fa;border:1px solid #dee2e6}
+.laudo-table td{padding:8px 12px;border:1px solid #dee2e6}
+.laudo-table tr:nth-child(even) td{background:#fafafa}
+
+/* ── STATUS ── */
+#statusImport{font-size:11px;margin-top:6px;min-height:16px;padding:0 2px}
+.status-ok{color:#1a7a40}
+.status-err{color:#c0392b}
+.status-info{color:#1a73e8}
+.status-warn{color:#e67e00}
+
+/* ── RESUMO FOOTER ── */
+.resumo-footer{background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:10px 12px;font-size:13px;margin-top:8px}
+
+/* ── AMOSTRAS NO MAPA ── */
+.amostra-lista{margin-top:8px}
+.amostra-item{border:1px solid #ddd;border-radius:4px;padding:8px 10px;margin-bottom:6px;font-size:12px;position:relative}
+.amostra-item .ai-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.amostra-item .ai-num{background:#185FA5;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.amostra-item .ai-name{font-weight:600;color:#222;flex:1;margin:0 6px}
+.amostra-item .ai-info{color:#666;font-size:11px}
+.amostra-item.completa{border-color:#4caf50;background:#f1f8e9}
+
+/* ── BADGE ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700}
+.badge-blue{background:#e8f0fe;color:#1a5276}
+.badge-green{background:#e8f5e9;color:#1b5e20}
+.badge-orange{background:#fff3e0;color:#e65100}
+.badge-red{background:#fdecea;color:#b71c1c}
+
+/* ── PRINT ── */
+#area-print{display:none}
+@media print{
+  /* Oculta TUDO — só mostra #area-print */
+  body > *:not(#area-print){ display:none!important }
+  body{font-family:'Times New Roman',serif;font-size:11pt;background:#fff;
+       height:auto;overflow:visible;margin:0;padding:0}
+  #area-print{display:block!important;margin:0;padding:0}
+  @page{size:A4;margin:2cm}
+  .print-break{page-break-before:always}
+  /* Garante que imagens não transbordem */
+  #area-print img{max-width:100%!important;height:auto!important}
+}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  #painel{position:fixed;top:0;left:-360px;height:100vh;z-index:2500;transition:left .3s;box-shadow:4px 0 12px rgba(0,0,0,.25)}
+  #painel.aberto{left:0}
+  #btnMobile{display:flex!important}
+}
+#btnMobile{display:none;position:fixed;top:58px;left:10px;z-index:3000;background:#1a73e8;color:#fff;border:none;border-radius:6px;width:38px;height:38px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+
+/* ── DIVIDER ── */
+.divider{height:1px;background:#f0f0f0;margin:10px 0}
+
+/* ── ABA INNER (scroll container) ── */
+.aba-inner{padding:18px 24px;width:100%;box-sizing:border-box}
+
+/* ── FOTOS ── */
+.foto-item{position:relative;border-radius:6px;overflow:hidden;background:#f0f0f0;aspect-ratio:4/3}
+.foto-item img{width:100%;height:100%;object-fit:cover;display:block}
+.foto-item .foto-caption{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);padding:4px 8px}
+.foto-item .foto-caption input{width:100%;background:transparent;border:none;color:#fff;font-size:11px;outline:none}
+.foto-item .foto-caption input::placeholder{color:rgba(255,255,255,.6)}
+.foto-item .foto-del{position:absolute;top:4px;right:4px;background:rgba(220,53,69,.85);color:#fff;border:none;border-radius:3px;width:22px;height:22px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
+
+/* ── TOOLTIP ── */
+.tooltip-label{font-size:10px;background:rgba(26,115,232,.9);color:#fff;border-radius:3px;padding:2px 6px;font-weight:700;white-space:nowrap;border:none}
+.tooltip-dist{font-size:10px;background:#fff;border:1px solid #1a73e8;border-radius:3px;padding:1px 5px;font-weight:700;color:#1a73e8;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<nav class="geo-nav">
+  <a href="index.html" class="nav-home">🌐 GeoSistema PRO</a>
+  <span class="nav-sep">/</span>
+  <span class="nav-current">🏡 Avaliação Imobiliária</span>
+  <div class="nav-tools">
+    <a href="rover.html" class="nav-btn">Rover</a>
+    <a href="geodescritivo_pro.html" class="nav-btn">Memorial</a>
+    <a href="avaliacao_geo_pro.html" class="nav-btn active">Avaliação</a>
+  </div>
+</nav>
+
+<!-- HEADER -->
+<header>
+  <div class="header-title">
+    GeoSistema PRO · Avaliação Imobiliária
+    <small>| NBR 14.653</small>
+  </div>
+  <div class="header-badges">
+    <span class="hbadge" id="hb-area">Avaliando: —</span>
+    <span class="hbadge verde" id="hb-amostras">Amostras: 0</span>
+    <span class="hbadge" id="hb-metodo">Método: —</span>
+    <button class="btn btn-ghost btn-sm" style="font-size:11px;height:28px;padding:0 10px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35)" onclick="salvarBackup()" title="Salvar todos os dados em arquivo JSON">💾 Salvar</button>
+    <button class="btn btn-ghost btn-sm" style="font-size:11px;height:28px;padding:0 10px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35)" onclick="document.getElementById('backup-input').click()" title="Carregar avaliação salva anteriormente">📂 Restaurar<input type="file" id="backup-input" accept=".json" style="display:none" onchange="restaurarBackup(this)"></button>
+  </div>
+</header>
+
+<!-- TABS PRINCIPAIS -->
+<div class="main-tabs">
+  <button class="main-tab active" onclick="setAba('terreno')">Terreno / Poligonal</button>
+  <button class="main-tab" onclick="setAba('comp')">Método Comparativo</button>
+  <button class="main-tab" onclick="setAba('evol')">Método Evolutivo</button>
+  <button class="main-tab" onclick="setAba('laudo')">Laudo Final</button>
+</div>
+
+<!-- WORKSPACE -->
+<div class="workspace">
+
+  <!-- ═══════════════════════════════════════ ABA TERRENO ═══ -->
+  <div id="aba-terreno" class="aba-content active">
+
+    <!-- PAINEL LATERAL -->
+    <div id="painel">
+
+      <!-- IMPORTAÇÃO -->
+      <div class="painel-sec">
+        <div class="sec-title">Importar poligonal</div>
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+          <div class="uz-title">Clique para importar arquivo</div>
+          <div class="uz-sub">KML · KMZ · CSV · GeoJSON · HTML do GeoSistema</div>
+          <input type="file" id="fileInput" accept=".csv,.html,.htm,.kml,.kmz,.txt,.geojson,.json"
+                 onchange="lerArquivo(this)" style="display:none">
+        </div>
+        <div id="statusImport"></div>
+      </div>
+
+      <!-- VÉRTICES MANUAIS -->
+      <div class="painel-sec">
+        <div class="sec-title">Ou inserir vértices manualmente</div>
+        <div class="form-row c3">
+          <div><span class="flabel">Latitude</span><input type="number" id="v-lat" class="finput" placeholder="-12.97" step="0.000001"></div>
+          <div><span class="flabel">Longitude</span><input type="number" id="v-lon" class="finput" placeholder="-38.50" step="0.000001"></div>
+          <div><span class="flabel">Rótulo</span><input type="text" id="v-rot" class="finput" placeholder="V-01" style="height:34px"></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="btn btn-blue btn-sm" style="flex:1" onclick="addVerticeManual()">+ Vértice</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadDemo()">Demo</button>
+          <button class="btn btn-red btn-sm" onclick="limparTudo()">Limpar</button>
+        </div>
+        <div id="lista-vertices"></div>
+      </div>
+
+      <!-- DADOS DO IMÓVEL -->
+      <div class="painel-sec">
+        <div class="sec-title">Dados do imóvel avaliando</div>
+        <div class="form-row c1"><div><span class="flabel">Proprietário</span><input type="text" id="nomeProprietario" class="finput" placeholder="Nome completo"></div></div>
+        <div class="form-row">
+          <div><span class="flabel">Matrícula</span><input type="text" id="matriculaImovel" class="finput" placeholder="Nº matrícula"></div>
+          <div><span class="flabel">Datum</span>
+            <select id="nomeDatum" class="finput">
+              <option value="SIRGAS 2000">SIRGAS 2000</option>
+              <option value="SAD 69">SAD 69</option>
+              <option value="WGS 84">WGS 84</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div><span class="flabel">Município</span><input type="text" id="nomeMunicipio" class="finput" placeholder="Município/BA"></div>
+          <div><span class="flabel">Comarca</span><input type="text" id="nomeComarca" class="finput" placeholder="Comarca"></div>
+        </div>
+        <div class="form-row">
+          <div><span class="flabel">Resp. Técnico</span><input type="text" id="nomeRT" class="finput" value="EVERMONDO LUCAS"></div>
+          <div><span class="flabel">CREA/CFT</span><input type="text" id="numCREA" class="finput" placeholder="Nº registro"></div>
+        </div>
+      </div>
+
+      <!-- RESUMO POLIGONAL -->
+      <div class="painel-sec">
+        <div class="sec-title">Resultados da poligonal</div>
+        <div class="resumo-footer">
+          <strong>Área:</strong> <span id="txtArea">—</span><br>
+          <strong>Perímetro:</strong> <span id="txtPeri">—</span><br>
+          <strong>Vértices:</strong> <span id="txtNV">0</span>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+          <span class="flabel" style="margin:0;white-space:nowrap">Altitude base (m):</span>
+          <input type="number" id="altBase" class="finput" value="0" step="0.01" style="width:90px;height:30px;font-size:12px" title="Aplicar a todos os vértices com altitude 0" oninput="aplicarAltBase()">
+          <button class="btn btn-ghost btn-sm" onclick="aplicarAltBase()" title="Aplicar altitude a todos os vértices zerados">Aplicar</button>
+        </div>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-green" onclick="calcularPoligonal()">Calcular poligonal</button>
+          <button class="btn btn-orange" onclick="setModoAmostra(true)" id="btnModoAm">Modo: marcar amostras</button>
+          <button class="btn btn-ghost btn-sm" onclick="alternarSatelite()">Alternar satélite/mapa</button>
+          <button class="btn btn-blue btn-sm" id="btn-cap-mapa" onclick="capturarMapaParaLaudo()">📷 Capturar mapa (satélite)</button>
+        </div>
+        <!-- CHAVE MAPBOX -->
+        <div style="margin-top:8px;padding:8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:4px">
+          <div style="font-size:10px;font-weight:700;color:#1b5e20;margin-bottom:4px">🗝️ Chave Mapbox (satélite HD)</div>
+          <input type="text" id="bingKey" class="finput" style="height:28px;font-size:11px;font-family:monospace"
+            placeholder="pk.eyJ1Ij... — Cole seu token público Mapbox"
+            oninput="salvarBingKey(this.value)" autocomplete="off">
+          <div style="font-size:10px;color:#2e7d32;margin-top:3px">
+            Sem chave: usa OpenStreetMap (sem satélite) ·
+            <a href="https://account.mapbox.com/auth/signup" target="_blank" style="color:#1a73e8">Criar token grátis</a>
+          </div>
+        </div>
+        <div id="preview-mapa-capturado" style="margin-top:8px;display:none">
+          <div style="font-size:11px;color:#1a7a40;margin-bottom:4px">✓ Mapa capturado — será incluído no laudo</div>
+          <img id="img-mapa-preview" style="width:100%;border-radius:4px;border:1px solid #ddd;max-height:120px;object-fit:cover">
+          <button class="btn btn-ghost btn-sm" style="margin-top:4px;width:100%" onclick="limparMapaCapturado()">Remover captura</button>
+        </div>
+      </div>
+
+      <!-- AMOSTRAS -->
+      <div class="painel-sec">
+        <div class="sec-title">Amostras georreferenciadas <span class="badge badge-blue" id="badge-am-count">0</span></div>
+        <div style="font-size:11px;color:#777;margin-bottom:8px" id="modo-info">Ative "marcar amostras" e clique no mapa</div>
+        <div class="amostra-lista" id="lista-amostras">
+          <div style="font-size:12px;color:#aaa;text-align:center;padding:10px">Nenhuma amostra marcada</div>
+        </div>
+      </div>
+
+    </div><!-- /painel -->
+
+    <!-- MAPA -->
+    <div id="map-wrap">
+      <div id="map-toolbar">
+        <span id="toolbar-info" style="font-size:12px;color:#555">
+          Modo: <strong id="modo-texto" style="color:#1a73e8">navegação</strong>
+        </span>
+        <button class="btn btn-ghost btn-sm" onclick="fitBounds()">Centralizar</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportarKMLpoli()">Exportar KML</button>
+      </div>
+      <div id="map"></div>
+    </div>
+
+  </div><!-- /aba-terreno -->
+
+  <!-- ═══════════════════════════════════════ ABA COMPARATIVO ═══ -->
+  <div id="aba-comp" class="aba-content">
+  <div class="aba-inner">
+
+    <div class="card">
+      <div class="card-title">Imóvel avaliando — dados para homogeneização</div>
+      <div class="form-row c3">
+        <div><span class="flabel">Área (m²) — da poligonal</span><input type="number" id="ca-area" class="finput" placeholder="calculada automaticamente" oninput="calcComparativo()"></div>
+        <div><span class="flabel">Topografia</span>
+          <select id="ca-topo" class="finput" onchange="calcComparativo()">
+            <option value="1.00">Plano</option>
+            <option value="0.95">Aclive suave</option>
+            <option value="0.90">Declive suave</option>
+            <option value="0.85">Aclive/Declive acentuado</option>
+          </select></div>
+        <div><span class="flabel">Situação</span>
+          <select id="ca-sit" class="finput" onchange="calcComparativo()">
+            <option value="1.00">Meio de quadra</option>
+            <option value="1.10">Esquina</option>
+            <option value="0.95">Encravado</option>
+          </select></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Elementos comparativos</div>
+      <div style="font-size:12px;color:#777;margin-bottom:10px">
+        As amostras marcadas no mapa aparecem aqui automaticamente.
+        Edite os valores e fatores para cada elemento.
+      </div>
+      <div class="elem-table-wrap">
+        <table class="elem-table">
+          <thead>
+            <tr>
+              <th style="min-width:100px">Elemento</th>
+              <th style="min-width:80px">Área (m²)</th>
+              <th style="min-width:90px">VU (R$/m²)</th>
+              <th style="min-width:70px">F. Área</th>
+              <th style="min-width:70px">F. Topo</th>
+              <th style="min-width:70px">F. Sit</th>
+              <th style="min-width:70px">F. Loc</th>
+              <th style="min-width:100px">VU hom.</th>
+              <th style="min-width:40px">Origem</th>
+              <th style="width:36px"></th>
+            </tr>
+          </thead>
+          <tbody id="elem-tbody"></tbody>
+        </table>
+      </div><!-- /elem-table-wrap -->
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="addElemManual()">+ Elemento manual</button>
+        <button class="btn btn-blue btn-sm" onclick="calcComparativo()">Calcular</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Resultado — Método Comparativo Direto</div>
+      <div class="metrics-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="metric-card"><div class="mc-lbl">Elementos</div><div class="mc-val" id="rc-n">0</div></div>
+        <div class="metric-card"><div class="mc-lbl">VU médio</div><div class="mc-val" id="rc-med">—</div><div class="mc-sub">R$/m²</div></div>
+        <div class="metric-card"><div class="mc-lbl">Desvio padrão</div><div class="mc-val" id="rc-dp">—</div><div class="mc-sub">R$/m²</div></div>
+        <div class="metric-card"><div class="mc-lbl">Coef. variação</div><div class="mc-val" id="rc-cv">—</div><div class="mc-sub">%</div></div>
+      </div>
+      <div class="resultado-box" id="comp-resultado" style="display:none">
+        <div class="rb-label">Valor pelo Método Comparativo</div>
+        <div class="rb-valor" id="rc-valor">—</div>
+        <div class="rb-info" id="rc-info"></div>
+      </div>
+    </div>
+
+  </div><!-- /aba-inner comp -->
+  </div><!-- /aba-comp -->
+
+  <!-- ═══════════════════════════════════════ ABA EVOLUTIVO ═══ -->
+  <div id="aba-evol" class="aba-content">
+  <div class="aba-inner">
+
+    <div class="card">
+      <div class="card-title">Valor do terreno</div>
+      <div class="form-row c3">
+        <div><span class="flabel">Área do terreno (m²)</span><input type="number" id="ea-area" class="finput" placeholder="da poligonal" oninput="calcEvolutivo()"></div>
+        <div><span class="flabel">Valor unitário (R$/m²)</span><input type="number" id="ea-vu" class="finput" placeholder="0" oninput="calcEvolutivo()"></div>
+        <div><span class="flabel">Fator de localização</span><input type="number" id="ea-fl" class="finput" value="1.00" step="0.01" oninput="calcEvolutivo()"></div>
+      </div>
+      <div style="text-align:right;font-size:13px;color:#555;margin-top:4px">
+        Valor do terreno: <strong id="ev-vt" style="color:#1b5e20">R$ —</strong>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Benfeitorias / construções</div>
+      <div id="benf-lista"></div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="addBenfeitoria()">+ Adicionar benfeitoria</button>
+      <div class="divider"></div>
+      <div style="text-align:right;font-size:13px;color:#555">
+        Total benfeitorias: <strong id="ev-vb" style="color:#1b5e20">R$ —</strong>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Composição do valor</div>
+      <div class="form-row c3">
+        <div><span class="flabel">Fator de comercialização</span><input type="number" id="ea-fc" class="finput" value="1.00" step="0.01" oninput="calcEvolutivo()"></div>
+        <div><span class="flabel">Depreciação global (%)</span><input type="number" id="ea-dep" class="finput" value="0" min="0" max="100" oninput="calcEvolutivo()"></div>
+        <div><span class="flabel">Grau de aproveitamento</span>
+          <select id="ea-ga" class="finput" onchange="calcEvolutivo()">
+            <option value="1.00">Pleno — 1,00</option>
+            <option value="0.80">Alto — 0,80</option>
+            <option value="0.60">Médio — 0,60</option>
+            <option value="0.40">Baixo — 0,40</option>
+          </select></div>
+      </div>
+      <div class="resultado-box" id="evol-resultado" style="display:none">
+        <div class="rb-label">Valor pelo Método Evolutivo</div>
+        <div class="rb-valor" id="ev-valor">—</div>
+        <div class="rb-info" id="ev-info"></div>
+      </div>
+    </div>
+
+  </div><!-- /aba-inner evol -->
+  </div><!-- /aba-evol -->
+
+  <!-- ═══════════════════════════════════════ ABA LAUDO ═══ -->
+  <div id="aba-laudo" class="aba-content">
+  <div class="aba-inner">
+
+    <div class="card">
+      <div class="card-title">Síntese dos valores apurados</div>
+      <div class="metrics-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:0">
+        <div class="metric-card"><div class="mc-lbl">Método comparativo</div><div class="mc-val" id="ls-vc" style="font-size:15px">—</div></div>
+        <div class="metric-card"><div class="mc-lbl">Método evolutivo</div><div class="mc-val" id="ls-ve" style="font-size:15px">—</div></div>
+        <div class="metric-card destaque"><div class="mc-lbl">Área pela poligonal</div><div class="mc-val" id="ls-area" style="font-size:15px">—</div><div class="mc-sub">m²</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Valor adotado e campo de arbítrio</div>
+      <div class="form-row">
+        <div><span class="flabel">Valor adotado (R$) — confirme ou ajuste</span><input type="number" id="l-val" class="finput" placeholder="0" oninput="updLaudo()"></div>
+        <div><span class="flabel">Grau de precisão (NBR 14.653)</span>
+          <select id="l-grau" class="finput" onchange="updLaudo()">
+            <option value="0.15">Grau II — ±15%</option>
+            <option value="0.10">Grau I — ±10%</option>
+            <option value="0.20">Grau III — ±20%</option>
+          </select></div>
+      </div>
+      <div class="form-row">
+        <div><span class="flabel">Finalidade da avaliação</span>
+          <select id="l-fin" class="finput">
+            <option>Alienação / compra e venda</option>
+            <option>Desapropriação</option>
+            <option>Garantia / hipoteca</option>
+            <option>Licitação / contratação pública</option>
+            <option>Inventário / judicial</option>
+            <option>Seguro</option>
+          </select></div>
+        <div><span class="flabel">Intervalo de confiança resultante</span><input type="text" id="l-intervalo" class="finput" readonly style="background:#f8f9fa"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Quadro de resultados — laudo técnico</div>
+      <table class="laudo-table">
+        <thead><tr><th>Item</th><th>Valor apurado</th><th>Situação / referência</th></tr></thead>
+        <tbody id="laudo-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Quadro de coordenadas (poligonal do avaliando)</div>
+      <div style="overflow-x:auto">
+        <table class="laudo-table" id="tabela-coords">
+          <thead><tr><th>Vértice</th><th>Latitude (DMS)</th><th>Longitude (DMS)</th><th>Alt (m)</th><th>Azimute → próx.</th><th>Dist (m)</th></tr></thead>
+          <tbody id="tbody-coords"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VISTORIA DO IMÓVEL -->
+    <div class="card">
+      <div class="card-title">Vistoria do imóvel</div>
+      <div class="form-row c3">
+        <div><span class="flabel">Data da vistoria</span><input type="date" id="v-data" class="finput"></div>
+        <div><span class="flabel">Hora</span><input type="time" id="v-hora" class="finput"></div>
+        <div><span class="flabel">Responsável pela vistoria</span><input type="text" id="v-resp" class="finput" placeholder="Nome do vistoriador"></div>
+      </div>
+      <div class="form-row">
+        <div><span class="flabel">Condições de acesso</span>
+          <select id="v-acesso" class="finput">
+            <option value="">Selecione...</option>
+            <option>Acesso livre — sem restrições</option>
+            <option>Acesso com acompanhante</option>
+            <option>Acesso parcial — área cercada</option>
+            <option>Acesso restrito — mediante autorização</option>
+            <option>Sem acesso — avaliação externa</option>
+          </select>
+        </div>
+        <div><span class="flabel">Situação de ocupação</span>
+          <select id="v-ocup" class="finput">
+            <option value="">Selecione...</option>
+            <option>Desocupado / vago</option>
+            <option>Ocupado pelo proprietário</option>
+            <option>Ocupado por terceiros (alugado)</option>
+            <option>Ocupado por posseiro</option>
+            <option>Em construção / reforma</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row c1">
+        <div><span class="flabel">Observações da vistoria</span>
+          <textarea id="v-obs" class="finput" rows="3" style="height:auto;padding:6px 9px;resize:vertical" placeholder="Condições gerais observadas, restrições de acesso, estado de conservação aparente..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- FATORES DE VALORIZAÇÃO / DEPRECIAÇÃO -->
+    <div class="card">
+      <div class="card-title">Fatores de valorização e depreciação</div>
+      <div style="font-size:11px;color:#777;margin-bottom:10px">Indique os fatores que influenciam positiva ou negativamente o valor do imóvel.</div>
+      <div class="form-row">
+        <div>
+          <span class="flabel">Padrão construtivo / uso do solo</span>
+          <select id="fat-padrao" class="finput">
+            <option value="">Selecione...</option>
+            <option>Zona rural — agropecuária</option>
+            <option>Zona rural — preservação ambiental</option>
+            <option>Zona urbana — residencial baixo padrão</option>
+            <option>Zona urbana — residencial médio padrão</option>
+            <option>Zona urbana — residencial alto padrão</option>
+            <option>Zona urbana — comercial</option>
+            <option>Zona urbana — industrial</option>
+            <option>Zona de expansão urbana</option>
+          </select>
+        </div>
+        <div>
+          <span class="flabel">Infraestrutura disponível</span>
+          <select id="fat-infra" class="finput">
+            <option value="">Selecione...</option>
+            <option>Completa (água, luz, esgoto, pavimento, calçada)</option>
+            <option>Parcial (água e luz, sem esgoto/pavimento)</option>
+            <option>Básica (somente energia elétrica)</option>
+            <option>Sem infraestrutura</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row c3">
+        <div>
+          <span class="flabel">Topografia</span>
+          <select id="fat-topo" class="finput">
+            <option value="">Selecione...</option>
+            <option>Plano — sem restrições</option>
+            <option>Suave ondulado</option>
+            <option>Ondulado</option>
+            <option>Forte ondulado — restrições construtivas</option>
+            <option>Montanhoso — severas restrições</option>
+          </select>
+        </div>
+        <div>
+          <span class="flabel">Vegetação / cobertura</span>
+          <select id="fat-veg" class="finput">
+            <option value="">Selecione...</option>
+            <option>Sem vegetação significativa</option>
+            <option>Pastagem / campo</option>
+            <option>Cultura agrícola</option>
+            <option>Reflorestamento</option>
+            <option>Mata nativa — APP/Reserva Legal</option>
+            <option>Mata nativa — sem restrição legal</option>
+          </select>
+        </div>
+        <div>
+          <span class="flabel">Estado de conservação</span>
+          <select id="fat-cons" class="finput">
+            <option value="">Selecione...</option>
+            <option>Novo / excelente</option>
+            <option>Bom — pequenos reparos</option>
+            <option>Regular — manutenção necessária</option>
+            <option>Ruim — reformas significativas</option>
+            <option>Péssimo — demolição/reconstrução</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row c1">
+        <div><span class="flabel">Fatores adicionais (valorização ou depreciação observados)</span>
+          <textarea id="fat-obs" class="finput" rows="3" style="height:auto;padding:6px 9px;resize:vertical" placeholder="Ex: proximidade a rodovias, rede de energia de alta tensão, APP, restrições legais, melhoramentos previstos..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- FONTES DAS AMOSTRAS -->
+    <div class="card">
+      <div class="card-title">Fontes dos dados comparativos</div>
+      <div style="font-size:11px;color:#777;margin-bottom:10px">Registre a origem de cada amostra utilizada no método comparativo.</div>
+      <div id="fontes-lista"></div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="addFonte()">+ Adicionar fonte</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Fotos do imóvel / registros fotográficos</div>
+      <div style="font-size:12px;color:#666;margin-bottom:10px">
+        Adicione fotos que serão incluídas <strong>apenas no laudo exportado</strong>. Até 12 imagens. Edite as legendas abaixo.
+      </div>
+      <div class="upload-zone" onclick="document.getElementById('foto-input').click()" style="margin-bottom:12px">
+        <div class="uz-title">Clique para adicionar fotos</div>
+        <div class="uz-sub">JPG · PNG · WEBP — múltiplas fotos de uma vez</div>
+        <input type="file" id="foto-input" accept="image/*" multiple style="display:none" onchange="adicionarFotos(this)">
+      </div>
+      <div id="fotos-lista-compacta"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:30px">
+      <button class="btn btn-green" onclick="prepararEExportar('imprimir')">Imprimir / salvar como PDF</button>
+      <button class="btn btn-blue" id="btn-exportar-pdf" onclick="prepararEExportar('pdf')">Exportar PDF (download direto)</button>
+      <button class="btn btn-ghost" onclick="exportarKMLpoli()">Exportar KML da poligonal</button>
+    </div>
+
+  </div><!-- /aba-inner laudo -->
+  </div><!-- /aba-laudo -->
+
+</div><!-- /workspace -->
+
+<!-- BOTÃO MOBILE -->
+<button id="btnMobile" onclick="document.getElementById('painel').classList.toggle('aberto')">☰</button>
+
+<!-- ÁREA DE IMPRESSÃO -->
+<div id="area-print"></div>
+
+<!-- SCRIPTS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────────
+// ESTADO GLOBAL
+// ─────────────────────────────────────────────────────────────
+let map, poligonalLayer, osmLayer, satLayer, isSat = false;
+let pontosPoligonal   = [];   // vértices do avaliando
+let amostras          = [];   // amostras georreferenciadas no mapa
+let elementos         = [];   // elementos comparativos
+let benfeitorias      = [];   // benfeitorias para método evolutivo
+let marcadoresVert    = [];   // marcadores de vértices no mapa
+let marcadoresAmostras= [];   // marcadores de amostras no mapa
+let labelsMap         = [];   // labels de dist/azimute
+let modoAmostra       = false;
+let valComp = 0, valEvol = 0, areaPoligonal = 0;
+
+// ─────────────────────────────────────────────────────────────
+// ABAS
+// ─────────────────────────────────────────────────────────────
+function setAba(nome) {
+  document.querySelectorAll('.main-tab').forEach((t,i) => {
+    const nomes = ['terreno','comp','evol','laudo'];
+    t.classList.toggle('active', nomes[i] === nome);
+  });
+  document.querySelectorAll('.aba-content').forEach(a => a.classList.remove('active'));
+  document.getElementById('aba-' + nome).classList.add('active');
+  if (nome === 'comp')  syncCompDadosAmostra();
+  if (nome === 'laudo') syncLaudo();
+  if (nome === 'terreno') {
+    // Inicializa mapa se ainda não foi (pode ter sido chamado antes do layout)
+    if (!mapIniciado) { setTimeout(initMap, 80); return; }
+    // Força o Leaflet a recalcular — 3 disparos em intervalos para garantir
+    [80, 250, 500].forEach(ms => setTimeout(() => map && map.invalidateSize(), ms));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// INICIALIZAÇÃO DO MAPA — lazy + ResizeObserver
+// ─────────────────────────────────────────────────────────────
+let mapIniciado = false;
+
+function initMap() {
+  if (mapIniciado) return;
+  const mapDiv = document.getElementById('map');
+  // Garante altura real antes de inicializar
+  if (!mapDiv || mapDiv.offsetHeight < 50) return;
+
+  mapIniciado = true;
+  osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom:22, maxNativeZoom:19, attribution:'© OSM' });
+  satLayer = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom:22, maxNativeZoom:19, attribution:'© Esri' });
+
+  map = L.map('map', { layers:[osmLayer], maxZoom:22 }).setView([-12.5315, -40.3054], 13);
+  poligonalLayer = L.polygon([], { color:'#1a73e8', weight:2.5, fillOpacity:.15 }).addTo(map);
+  map.on('click', onMapClick);
+  map.invalidateSize();
+
+  // Se já havia vértices carregados antes do mapa iniciar, desenha
+  if (pontosPoligonal.length) { desenharPoligonal(); calcularPoligonal(); }
+  if (amostras.length) amostras.forEach(a => adicionarMarcadorAmostra(a));
+
+  // Recebe vértices transferidos do Rover via sessionStorage
+  try {
+    const raw = sessionStorage.getItem('geo_vertices_avaliacao');
+    if (raw) {
+      const verts = JSON.parse(raw);
+      if (verts && verts.length >= 3) {
+        pontosPoligonal = verts.map(p => ({
+          nome: p.nome || p.label || ('V'+(pontosPoligonal.length+1)),
+          label: p.label || p.nome || ('V'+(pontosPoligonal.length+1)),
+          lat: parseFloat(p.lat),
+          lon: parseFloat(p.lon),
+          alt: parseFloat(p.alt) || 0,
+          latDMS: p.latDMS || decimalParaDMS(parseFloat(p.lat)),
+          lonDMS: p.lonDMS || decimalParaDMS(parseFloat(p.lon)),
+        }));
+        sessionStorage.removeItem('geo_vertices_avaliacao');
+        mostrarStatus('✓ ' + pontosPoligonal.length + ' vértice(s) recebido(s) do Rover GNSS.','ok');
+        renderListaVertices();
+        desenharPoligonal();
+        calcularPoligonal();
+      }
+    }
+  } catch(e) { console.warn('sessionStorage:', e); }
+}
+
+window.addEventListener('load', () => {
+  // Tenta inicializar depois do layout estar pronto
+  setTimeout(() => {
+    const mapDiv = document.getElementById('map');
+    if (mapDiv && mapDiv.offsetHeight >= 50) {
+      initMap();
+    } else {
+      // Layout ainda não tem tamanho — espera mais
+      setTimeout(initMap, 400);
+    }
+  }, 150);
+
+  // ResizeObserver — avisa o Leaflet sempre que o container muda de tamanho
+  const ro = new ResizeObserver(() => {
+    if (map) map.invalidateSize();
+    else initMap(); // primeira vez que ganha tamanho
+  });
+  const wrap = document.getElementById('map-wrap');
+  if (wrap) ro.observe(wrap);
+});
+
+function alternarSatelite() {
+  if (!map) return;
+  if (isSat) { map.removeLayer(satLayer); map.addLayer(osmLayer); }
+  else       { map.removeLayer(osmLayer); map.addLayer(satLayer); }
+  isSat = !isSat;
+}
+
+function fitBounds() {
+  if (!map) return;
+  if (pontosPoligonal.length >= 2) map.fitBounds(L.latLngBounds(pontosPoligonal.map(p => [p.lat, p.lon])), { padding:[40,40] });
+  else if (amostras.length) map.fitBounds(L.latLngBounds(amostras.map(a => [a.lat, a.lon])), { padding:[40,40] });
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODO AMOSTRA
+// ─────────────────────────────────────────────────────────────
+function setModoAmostra(ativo) {
+  modoAmostra = ativo;
+  const btn = document.getElementById('btnModoAm');
+  const info = document.getElementById('modo-info');
+  const txt  = document.getElementById('modo-texto');
+  if (ativo) {
+    btn.textContent = 'Modo: navegação (clique p/ sair)';
+    btn.className = 'btn btn-green';
+    info.textContent = 'Clique no mapa para marcar amostras comparativas';
+    txt.textContent = 'marcar amostras';
+    btn.onclick = () => setModoAmostra(false);
+  } else {
+    btn.textContent = 'Modo: marcar amostras';
+    btn.className = 'btn btn-orange';
+    info.textContent = 'Ative o modo para clicar no mapa e marcar amostras';
+    txt.textContent = 'navegação';
+    btn.onclick = () => setModoAmostra(true);
+  }
+}
+
+function onMapClick(e) {
+  if (!modoAmostra) return;
+  const n = amostras.length + 1;
+  const am = { id: Date.now(), n, lat: e.latlng.lat, lon: e.latlng.lng,
+    label: 'Amostra ' + n, area: 0, vu: 0,
+    farea: 1, ftopo: 1, fsit: 1, floc: 1 };
+  amostras.push(am);
+  adicionarMarcadorAmostra(am);
+  renderListaAmostras();
+  atualizarBadges();
+}
+
+function adicionarMarcadorAmostra(am) {
+  const mk = L.marker([am.lat, am.lon], {
+    icon: L.divIcon({ className:'',
+      html:`<div style="background:#185FA5;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.3);">${am.n}</div>`,
+      iconSize:[26,26], iconAnchor:[13,13] })
+  }).addTo(map);
+  mk.bindTooltip(`<b>${am.label}</b><br>${am.lat.toFixed(6)}, ${am.lon.toFixed(6)}`, { direction:'top', offset:[0,-14] });
+  marcadoresAmostras.push({ id: am.id, mk });
+}
+
+function renderListaAmostras() {
+  const el = document.getElementById('lista-amostras');
+  if (!amostras.length) {
+    el.innerHTML = '<div style="font-size:12px;color:#aaa;text-align:center;padding:10px">Nenhuma amostra marcada</div>';
+    return;
+  }
+  el.innerHTML = amostras.map(a => `
+    <div class="amostra-item ${a.area > 0 && a.vu > 0 ? 'completa' : ''}">
+      <div class="ai-header">
+        <span class="ai-num">${a.n}</span>
+        <span class="ai-name">${a.label}</span>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" style="padding:0 7px;font-size:11px" onclick="editarAmostra(${a.id})">Editar</button>
+          <button class="btn btn-red btn-sm" style="padding:0 7px;font-size:11px" onclick="removerAmostra(${a.id})">✕</button>
+        </div>
+      </div>
+      <div class="ai-info">
+        ${a.lat.toFixed(5)}, ${a.lon.toFixed(5)}
+        ${a.area > 0 ? ` · ${fmtN(a.area,0)} m²` : ''}
+        ${a.vu > 0 ? ` · R$ ${fmtN(a.vu)}/m²` : ''}
+        ${a.area > 0 && a.vu > 0 ? '' : ' <span style="color:#e67e00">⚠ Informe área e VU</span>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+function editarAmostra(id) {
+  const a = amostras.find(x => x.id === id); if (!a) return;
+  const label = prompt('Rótulo:', a.label); if (label !== null) a.label = label;
+  const area  = prompt('Área (m²):', a.area || ''); if (area !== null) a.area = parseFloat(area) || 0;
+  const vu    = prompt('Valor unitário (R$/m²):', a.vu || ''); if (vu !== null) a.vu = parseFloat(vu) || 0;
+  const farea = prompt('Fator de área:', a.farea); if (farea !== null) a.farea = parseFloat(farea) || 1;
+  const ftopo = prompt('Fator topografia:', a.ftopo); if (ftopo !== null) a.ftopo = parseFloat(ftopo) || 1;
+  const fsit  = prompt('Fator situação:', a.fsit);  if (fsit  !== null) a.fsit  = parseFloat(fsit)  || 1;
+  const floc  = prompt('Fator localização:', a.floc); if (floc  !== null) a.floc  = parseFloat(floc)  || 1;
+  const mk = marcadoresAmostras.find(x => x.id === id);
+  if (mk) mk.mk.setTooltipContent(`<b>${a.label}</b><br>${a.lat.toFixed(5)}, ${a.lon.toFixed(5)}`);
+  renderListaAmostras(); atualizarBadges(); sincronizarElemsDeAmostras();
+}
+
+function removerAmostra(id) {
+  const mkEntry = marcadoresAmostras.find(x => x.id === id);
+  if (mkEntry) { map.removeLayer(mkEntry.mk); }
+  marcadoresAmostras = marcadoresAmostras.filter(x => x.id !== id);
+  amostras = amostras.filter(x => x.id !== id);
+  renderListaAmostras(); atualizarBadges(); sincronizarElemsDeAmostras();
+}
+
+// ─────────────────────────────────────────────────────────────
+// PARSERS — idênticos ao geomemorial_pro.js
+// ─────────────────────────────────────────────────────────────
+function utmParaGeo(E, N, fuso, hem) {
+  hem = (hem || 'S').toUpperCase();
+  const a=6378137,f=1/298.257223563,b=a*(1-f),e2=1-(b*b)/(a*a),k0=0.9996;
+  const lon0=(fuso*6-183)*Math.PI/180;
+  const x=E-500000, y=hem==='S'?N-10000000:N;
+  const e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  const M=y/k0;
+  const mu=M/(a*(1-e2/4-3*e2*e2/64-5*e2*e2*e2/256));
+  const fp=mu+(3*e1/2-27*e1**3/32)*Math.sin(2*mu)+(21*e1**2/16-55*e1**4/32)*Math.sin(4*mu)+(151*e1**3/96)*Math.sin(6*mu)+(1097*e1**4/512)*Math.sin(8*mu);
+  const sinFp=Math.sin(fp),cosFp=Math.cos(fp),tanFp=sinFp/cosFp;
+  const N1=a/Math.sqrt(1-e2*sinFp*sinFp),T1=tanFp*tanFp,C1=e2/(1-e2)*cosFp*cosFp;
+  const R1=a*(1-e2)/Math.pow(1-e2*sinFp*sinFp,1.5),D=x/(N1*k0);
+  const lat=fp-(N1*tanFp/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*e2/(1-e2))*D**4/24+(61+90*T1+298*C1+45*T1*T1-252*e2/(1-e2)-3*C1*C1)*D**6/720);
+  const lon=lon0+(D-(1+2*T1+C1)*D**3/6+(5-2*C1+28*T1-3*C1*C1+8*e2/(1-e2)+24*T1*T1)*D**5/120)/cosFp;
+  return { lat: lat*180/Math.PI, lon: lon*180/Math.PI };
+}
+
+function converterDMS(dms) {
+  if (!dms || typeof dms !== 'string') return 0;
+  if (/^-?[\d.]+$/.test(dms.trim())) return parseFloat(dms);
+  const n = dms.replace(/[°d'"ms]/gi,' ').trim().match(/-?[\d.]+/g);
+  if (!n||n.length<2) return parseFloat(dms)||0;
+  const r=Math.abs(parseFloat(n[0]))+(parseFloat(n[1])/60||0)+(parseFloat(n[2])/3600||0);
+  return (dms.trim().startsWith('-')||/[SWsw]/.test(dms)) ? -r : r;
+}
+
+function decimalParaDMS(dec) {
+  const s=dec<0?'-':'',a=Math.abs(dec),g=Math.floor(a),mF=(a-g)*60,m=Math.floor(mF),sg=((mF-m)*60).toFixed(2);
+  return `${s}${g}°${String(m).padStart(2,'0')}'${sg}"`;
+}
+
+function formatarDMS(dms) {
+  if (!dms||typeof dms!=='string') return String(dms||'');
+  if (/^-?[\d.]+$/.test(dms.trim())) return decimalParaDMS(parseFloat(dms));
+  const n=dms.replace(/[°d'"ms]/gi,' ').trim().match(/-?[\d.]+/g);
+  if (!n||n.length<2) return dms;
+  return `${dms.trim().startsWith('-')?'-':''}${Math.abs(parseInt(n[0]))}°${String(parseInt(n[1])).padStart(2,'0')}'${parseFloat(n[2]||0).toFixed(2)}"`;
+}
+
+function azimutePorExtenso(az) {
+  let base, quad;
+  if(az<90){base=az;quad=['N','E'];}
+  else if(az<180){base=180-az;quad=['S','E'];}
+  else if(az<270){base=az-180;quad=['S','O'];}
+  else{base=360-az;quad=['N','O'];}
+  const g=Math.floor(base),mF=(base-g)*60,m=Math.floor(mF),s=Math.round((mF-m)*60);
+  return `${quad[0]} ${g}°${String(m).padStart(2,'0')}'${String(s).padStart(2,'0')}" ${quad[1]}`;
+}
+
+function processarCSV(texto) {
+  const pts=[], erros=[];
+  const linhas=texto.split(/\r?\n/).filter(l=>l.trim());
+  if(linhas.length<2){mostrarStatus('CSV sem dados.','err');return pts;}
+  const sep=(linhas[0].match(/;/g)||[]).length>(linhas[0].match(/,/g)||[]).length?';':',';
+  const cab=linhas[0].split(sep).map(c=>c.trim().replace(/^["']|["']$/g,'').toLowerCase());
+  const iN=cab.findIndex(c=>/^(nome|id|ponto|v[eé]rtice|pt|vertex|name)/i.test(c));
+  const iLat=cab.findIndex(c=>/^(lat|latitude|y_geo|lat_dd)/i.test(c));
+  const iLon=cab.findIndex(c=>/^(lon|long|longitude|x_geo|lon_dd)/i.test(c));
+  const iAlt=cab.findIndex(c=>/^(alt|altitude|z|elev|cota)/i.test(c));
+  const iE=cab.findIndex(c=>/^(e$|east|easting|utm_e|x_utm|este)/i.test(c));
+  const iNu=cab.findIndex(c=>/^(n$|north|northing|utm_n|y_utm|norte)/i.test(c));
+  const iFus=cab.findIndex(c=>/^(fuso|zone)/i.test(c));
+  const iHem=cab.findIndex(c=>/^(hem|hemisf)/i.test(c));
+  const modoUTM=(iLat===-1||iLon===-1)&&iE!==-1&&iNu!==-1;
+  for(let i=1;i<linhas.length;i++){
+    const col=linhas[i].split(sep).map(c=>c.trim().replace(/^["']|["']$/g,''));
+    if(col.length<2) continue;
+    let lat,lon,latDMS,lonDMS;
+    if(modoUTM){
+      const Ev=parseFloat(col[iE]?.replace(',','.')),Nv=parseFloat(col[iNu]?.replace(',','.'));
+      const fus=iFus>=0?parseInt(col[iFus]):24,hem=iHem>=0?col[iHem]:'S';
+      if(isNaN(Ev)||isNaN(Nv)){erros.push(i+1);continue;}
+      const g=utmParaGeo(Ev,Nv,fus,hem);lat=g.lat;lon=g.lon;
+      latDMS=decimalParaDMS(lat);lonDMS=decimalParaDMS(lon);
+    } else {
+      const latStr=col[iLat]||'',lonStr=col[iLon]||'';
+      lat=converterDMS(latStr);lon=converterDMS(lonStr);latDMS=latStr;lonDMS=lonStr;
+      if(isNaN(lat)||lat<-90||lat>90){erros.push(i+1);continue;}
+    }
+    const nomeBase=(iN>=0?col[iN]:null)||('P'+i);
+    pts.push({nome:nomeBase,label:nomeBase,latDMS,lonDMS,alt:iAlt>=0?parseFloat(col[iAlt])||0:0,lat,lon});
+  }
+  return pts;
+}
+
+function processarHTML(html) {
+  const pts=[];
+  const m=html.match(/const\s+pontos\s*=\s*(\[[\s\S]*?\]);/);
+  if(m){
+    try{
+      const arr=Function('"use strict"; return '+m[1])();
+      arr.forEach((p,i)=>{
+        const ls=p.latDMS||p.lat?.toString()||'';
+        const lo=p.lonDMS||p.lon?.toString()||'';
+        const nome=p.id||p.nome||('P'+(i+1));
+        pts.push({nome,label:p.label||nome,latDMS:ls,lonDMS:lo,alt:p.alt||0,lat:p.latDec??converterDMS(ls),lon:p.lonDec??converterDMS(lo)});
+      });
+      if(pts.length) return pts;
+    }catch(e){}
+  }
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  doc.querySelectorAll('table').forEach(tab=>{
+    const ths=Array.from(tab.querySelectorAll('th')).map(t=>t.textContent.trim().toLowerCase());
+    const iLa=ths.findIndex(t=>/lat/i.test(t)),iLo=ths.findIndex(t=>/lon/i.test(t));
+    const iNm=ths.findIndex(t=>/nome|name|ponto|v[eé]rtice/i.test(t));
+    const iAl=ths.findIndex(t=>/alt/i.test(t));
+    if(iLa===-1||iLo===-1) return;
+    tab.querySelectorAll('tbody tr').forEach((row,ri)=>{
+      const c=row.querySelectorAll('td');if(c.length<2) return;
+      const ls=c[iLa]?.textContent.trim()||'',lo=c[iLo]?.textContent.trim()||'';if(!ls) return;
+      const nome=(iNm>=0?c[iNm]?.textContent.trim():null)||('P'+(ri+1));
+      pts.push({nome,label:nome,latDMS:ls,lonDMS:lo,alt:iAl>=0?parseFloat(c[iAl]?.textContent)||0:0,lat:converterDMS(ls),lon:converterDMS(lo)});
+    });
+  });
+  return pts;
+}
+
+function processarKML(txt) {
+  const pts=[];
+  let doc;
+  try{doc=new DOMParser().parseFromString(txt,'text/xml');if(doc.querySelector('parsererror')) return pts;}catch(e){return pts;}
+  function getAlt(pm){for(const d of pm.querySelectorAll('ExtendedData SimpleData'))if(/alt|cota|elev|z/i.test(d.getAttribute('name')||''))return parseFloat(d.textContent)||0;return null;}
+  doc.querySelectorAll('Placemark').forEach((pm,i)=>{
+    const nome=pm.querySelector('name')?.textContent.trim()||('P'+(i+1));
+    const pc=pm.querySelector('Point coordinates');if(!pc) return;
+    const p=pc.textContent.trim().split(',');if(p.length<2) return;
+    const lon=parseFloat(p[0]),lat=parseFloat(p[1]),alt=getAlt(pm)??(parseFloat(p[2])||0);
+    if(isNaN(lat)||isNaN(lon)) return;
+    pts.push({nome,label:nome,alt,lat,lon,latDMS:decimalParaDMS(lat),lonDMS:decimalParaDMS(lon)});
+  });
+  if(!pts.length){
+    let idx=1;
+    for(const sel of['Polygon outerBoundaryIs coordinates','LinearRing coordinates','LineString coordinates']){
+      doc.querySelectorAll(sel).forEach(el=>{
+        el.textContent.trim().split(/\s+/).forEach(par=>{
+          const p=par.split(',');if(p.length<2) return;
+          const lon=parseFloat(p[0]),lat=parseFloat(p[1]);
+          if(!isNaN(lat)&&!isNaN(lon)) pts.push({nome:'V'+idx,label:'V'+idx,alt:parseFloat(p[2])||0,lat,lon,latDMS:decimalParaDMS(lat),lonDMS:decimalParaDMS(lon)});
+          idx++;
+        });
+        if(pts.length>1){const p0=pts[0],pN=pts[pts.length-1];if(Math.abs(p0.lat-pN.lat)<1e-7&&Math.abs(p0.lon-pN.lon)<1e-7)pts.pop();}
+      });
+      if(pts.length) break;
+    }
+  }
+  return pts;
+}
+
+function processarGeoJSON(txt) {
+  const pts=[];
+  try{
+    const gj=JSON.parse(txt);
+    const feats=gj.type==='FeatureCollection'?gj.features:[gj];
+    feats.forEach(f=>{
+      const geo=f.geometry||f;if(!geo) return;
+      let coords=[];
+      if(geo.type==='Polygon') coords=geo.coordinates[0];
+      else if(geo.type==='LineString') coords=geo.coordinates;
+      else if(geo.type==='Point') coords=[geo.coordinates];
+      coords.forEach((c,i)=>{
+        if(c.length>=2) pts.push({nome:'V'+(pts.length+1),label:'V'+(pts.length+1),alt:c[2]||0,lat:c[1],lon:c[0],latDMS:decimalParaDMS(c[1]),lonDMS:decimalParaDMS(c[0])});
+      });
+    });
+  }catch(e){}
+  return pts;
+}
+
+function lerArquivo(input) {
+  const file=input.files[0];if(!file) return;
+  if(file.size>10*1024*1024){mostrarStatus('Arquivo muito grande (máx 10MB).','err');return;}
+  const nome=file.name.toLowerCase();
+  mostrarStatus('Lendo '+file.name+'...','info');
+  if(nome.endsWith('.kmz')){
+    const r=new FileReader();
+    r.onload=e=>{
+      JSZip.loadAsync(e.target.result).then(zip=>{
+        const kml=Object.values(zip.files).find(f=>f.name.toLowerCase().endsWith('.kml'));
+        if(!kml){mostrarStatus('KMZ sem KML interno.','err');return;}
+        kml.async('string').then(txt=>{
+          const pts=processarKML(txt);
+          finalizarLeitura(pts,file.name);
+        });
+      }).catch(()=>mostrarStatus('Erro ao descompactar KMZ.','err'));
+    };
+    r.readAsArrayBuffer(file);return;
+  }
+  const r=new FileReader();
+  r.onload=e=>{
+    const c=e.target.result;let pts=[];
+    if(nome.endsWith('.kml'))       pts=processarKML(c);
+    else if(nome.endsWith('.html')||nome.endsWith('.htm')) pts=processarHTML(c);
+    else if(nome.endsWith('.csv')||nome.endsWith('.txt'))  pts=processarCSV(c);
+    else if(nome.endsWith('.geojson')||nome.endsWith('.json')) pts=processarGeoJSON(c);
+    else{mostrarStatus('Formato não reconhecido.','err');return;}
+    finalizarLeitura(pts,file.name);
+  };
+  r.readAsText(file,'UTF-8');
+}
+
+function finalizarLeitura(pts, nomeArq) {
+  if(!pts.length){mostrarStatus('Nenhum vértice encontrado em "'+nomeArq+'".','err');return;}
+  pontosPoligonal=pts;
+  mostrarStatus('✓ '+pts.length+' vértice(s) carregados de "'+nomeArq+'".','ok');
+  renderListaVertices();
+  desenharPoligonal();
+  calcularPoligonal();
+}
+
+function mostrarStatus(msg, tipo) {
+  const el=document.getElementById('statusImport');
+  el.textContent=msg;
+  el.className=tipo==='ok'?'status-ok':tipo==='err'?'status-err':tipo==='warn'?'status-warn':'status-info';
+}
+
+// ─────────────────────────────────────────────────────────────
+// VÉRTICES MANUAIS
+// ─────────────────────────────────────────────────────────────
+function addVerticeManual() {
+  const lat=parseFloat(document.getElementById('v-lat').value);
+  const lon=parseFloat(document.getElementById('v-lon').value);
+  const rot=document.getElementById('v-rot').value||('V-'+String(pontosPoligonal.length+1).padStart(2,'0'));
+  if(isNaN(lat)||isNaN(lon)){alert('Informe lat/lon válidos.');return;}
+  pontosPoligonal.push({nome:rot,label:rot,lat,lon,alt:0,latDMS:decimalParaDMS(lat),lonDMS:decimalParaDMS(lon)});
+  document.getElementById('v-lat').value='';
+  document.getElementById('v-lon').value='';
+  document.getElementById('v-rot').value='';
+  renderListaVertices();desenharPoligonal();calcularPoligonal();
+}
+
+function loadDemo() {
+  pontosPoligonal=[
+    {nome:'V-01',label:'V-01',lat:-12.9726,lon:-38.5016,alt:18,latDMS:decimalParaDMS(-12.9726),lonDMS:decimalParaDMS(-38.5016)},
+    {nome:'V-02',label:'V-02',lat:-12.9721,lon:-38.5009,alt:17,latDMS:decimalParaDMS(-12.9721),lonDMS:decimalParaDMS(-38.5009)},
+    {nome:'V-03',label:'V-03',lat:-12.9728,lon:-38.5003,alt:16,latDMS:decimalParaDMS(-12.9728),lonDMS:decimalParaDMS(-38.5003)},
+    {nome:'V-04',label:'V-04',lat:-12.9735,lon:-38.5011,alt:17,latDMS:decimalParaDMS(-12.9735),lonDMS:decimalParaDMS(-38.5011)},
+    {nome:'V-05',label:'V-05',lat:-12.9730,lon:-38.5018,alt:18,latDMS:decimalParaDMS(-12.9730),lonDMS:decimalParaDMS(-38.5018)},
+  ];
+  mostrarStatus('Demo Bahia carregado — 5 vértices.','ok');
+  renderListaVertices();desenharPoligonal();calcularPoligonal();
+}
+
+function limparTudo() {
+  if(!confirm('Limpar todos os vértices?')) return;
+  pontosPoligonal=[];
+  if(map){marcadoresVert.forEach(m=>map.removeLayer(m));labelsMap.forEach(l=>map.removeLayer(l));poligonalLayer?.setLatLngs([]);}
+  marcadoresVert=[];labelsMap=[];
+  renderListaVertices();
+  document.getElementById('txtArea').textContent='—';
+  document.getElementById('txtPeri').textContent='—';
+  document.getElementById('txtNV').textContent='0';
+  document.getElementById('hb-area').textContent='Avaliando: —';
+  areaPoligonal=0;
+  document.getElementById('ea-area').placeholder='da poligonal';
+  document.getElementById('ca-area').placeholder='calculada automaticamente';
+}
+
+function renderListaVertices() {
+  const el=document.getElementById('lista-vertices');
+  if(!pontosPoligonal.length){el.innerHTML='<div style="font-size:12px;color:#aaa;padding:8px">Nenhum vértice carregado.</div>';return;}
+  el.innerHTML=pontosPoligonal.map((v,i)=>`
+    <div class="v-item">
+      <div class="v-dot"></div>
+      <span style="flex:1;font-size:12px" onclick="centrarVertice(${i})"><strong>${v.label||v.nome}</strong></span>
+      <input type="number" value="${v.alt||0}" step="0.01" title="Altitude (m)"
+             style="width:58px;height:22px;font-size:11px;border:1px solid #ddd;border-radius:3px;padding:0 4px;text-align:right"
+             onchange="pontosPoligonal[${i}].alt=parseFloat(this.value)||0">
+      <span style="font-size:9px;color:#aaa;margin-left:1px">m</span>
+      <button onclick="event.stopPropagation();removerVertice(${i})" style="background:none;border:none;cursor:pointer;color:#c00;font-size:12px;padding:0 3px">✕</button>
+    </div>
+  `).join('');
+}
+
+function removerVertice(i){pontosPoligonal.splice(i,1);renderListaVertices();desenharPoligonal();calcularPoligonal();}
+function centrarVertice(i){if(map&&pontosPoligonal[i])map.setView([pontosPoligonal[i].lat,pontosPoligonal[i].lon],18);}
+
+// ─────────────────────────────────────────────────────────────
+// POLIGONAL NO MAPA
+// ─────────────────────────────────────────────────────────────
+function desenharPoligonal() {
+  // Se mapa ainda não iniciou, agenda redesenho para depois
+  if (!map) { setTimeout(desenharPoligonal, 200); return; }
+
+  marcadoresVert.forEach(m=>map.removeLayer(m));marcadoresVert=[];
+  labelsMap.forEach(l=>map.removeLayer(l));labelsMap=[];
+  if(!pontosPoligonal.length){poligonalLayer.setLatLngs([]);return;}
+  poligonalLayer.setLatLngs(pontosPoligonal.map(p=>[p.lat,p.lon]));
+  pontosPoligonal.forEach((p,idx)=>{
+    const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'',
+      html:`<div style="background:#1a73e8;border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;box-shadow:0 2px 5px rgba(0,0,0,.3);">${p.label||p.nome}</div>`,
+      iconSize:[24,24],iconAnchor:[12,12]})}).addTo(map);
+    m.bindTooltip(`<b>${p.label||p.nome}</b><br>${formatarDMS(p.latDMS)}<br>${formatarDMS(p.lonDMS)}`,{direction:'top',offset:[0,-14]});
+    marcadoresVert.push(m);
+  });
+  if(pontosPoligonal.length>1){
+    for(let i=0;i<pontosPoligonal.length;i++){
+      const j=(i+1)%pontosPoligonal.length;
+      if(i===pontosPoligonal.length-1&&pontosPoligonal.length<3) continue;
+      const p1=pontosPoligonal[i],p2=pontosPoligonal[j];
+      const dist=L.latLng(p1.lat,p1.lon).distanceTo(L.latLng(p2.lat,p2.lon));
+      const mid=[(p1.lat+p2.lat)/2,(p1.lon+p2.lon)/2];
+      const ld=L.marker(mid,{icon:L.divIcon({className:'tooltip-dist',html:dist.toFixed(2)+'m',iconAnchor:[0,-8]})}).addTo(map);
+      const az=(Math.atan2(p2.lon-p1.lon,p2.lat-p1.lat)*180/Math.PI+360)%360;
+      const la=L.marker([(p1.lat*.4+p2.lat*.6),(p1.lon*.4+p2.lon*.6)],{icon:L.divIcon({className:'tooltip-label',html:azimutePorExtenso(az),iconAnchor:[0,10]})}).addTo(map);
+      labelsMap.push(ld,la);
+    }
+  }
+  if(pontosPoligonal.length>=2) map.fitBounds(poligonalLayer.getBounds(),{padding:[40,40]});
+}
+
+function calcularPoligonal() {
+  const n=pontosPoligonal.length;
+  document.getElementById('txtNV').textContent=n;
+  if(n<3){document.getElementById('txtArea').textContent='—';document.getElementById('txtPeri').textContent='—';areaPoligonal=0;return;}
+  let soma=0,perim=0;
+  for(let i=0;i<n;i++){
+    const j=(i+1)%n;
+    soma+=(pontosPoligonal[i].lon*pontosPoligonal[j].lat)-(pontosPoligonal[j].lon*pontosPoligonal[i].lat);
+    perim+=L.latLng(pontosPoligonal[i].lat,pontosPoligonal[i].lon).distanceTo(L.latLng(pontosPoligonal[j].lat,pontosPoligonal[j].lon));
+  }
+  const fL=111319.9,fLo=111319.9*Math.cos(pontosPoligonal[0].lat*Math.PI/180);
+  areaPoligonal=Math.abs(soma/2)*fL*fLo;
+  const exibirArea=areaPoligonal>=10000?`${(areaPoligonal/10000).toFixed(4)} ha (${fmtN(areaPoligonal,2)} m²)`:`${fmtN(areaPoligonal,2)} m²`;
+  document.getElementById('txtArea').textContent=exibirArea;
+  document.getElementById('txtPeri').textContent=fmtN(perim,2)+' m';
+  document.getElementById('hb-area').textContent='Avaliando: '+fmtN(areaPoligonal,0)+' m²';
+  document.getElementById('ca-area').placeholder=fmtN(areaPoligonal,0)+' (poligonal)';
+  document.getElementById('ea-area').placeholder=fmtN(areaPoligonal,0)+' (poligonal)';
+  atualizarBadges();
+}
+
+// ─────────────────────────────────────────────────────────────
+// MÉTODO COMPARATIVO
+// ─────────────────────────────────────────────────────────────
+function sincronizarElemsDeAmostras() {
+  amostras.filter(a=>a.area>0&&a.vu>0).forEach(a=>{
+    if(!elementos.find(e=>e.srcId===a.id)){
+      elementos.push({id:a.id,srcId:a.id,label:a.label,area:a.area,vu:a.vu,farea:a.farea||1,ftopo:a.ftopo||1,fsit:a.fsit||1,floc:a.floc||1,fromMap:true});
+    } else {
+      const e=elementos.find(x=>x.srcId===a.id);
+      e.area=a.area;e.vu=a.vu;e.label=a.label;e.farea=a.farea;e.ftopo=a.ftopo;e.fsit=a.fsit;e.floc=a.floc;
+    }
+  });
+  renderElementos();calcComparativo();
+}
+
+function syncCompDadosAmostra() { sincronizarElemsDeAmostras(); }
+
+function addElemManual() {
+  elementos.push({id:Date.now(),srcId:null,label:'Elem.'+(elementos.length+1),area:0,vu:0,farea:1,ftopo:1,fsit:1,floc:1,fromMap:false});
+  renderElementos();
+}
+
+function vuHom(e) { return(parseFloat(e.vu)||0)*(parseFloat(e.farea)||1)*(parseFloat(e.ftopo)||1)*(parseFloat(e.fsit)||1)*(parseFloat(e.floc)||1); }
+
+function renderElementos() {
+  const tb=document.getElementById('elem-tbody');
+  if(!elementos.length){tb.innerHTML='<tr><td colspan="10" style="text-align:center;color:#aaa;padding:16px;font-size:12px">Nenhum elemento. Adicione amostras no mapa ou manualmente.</td></tr>';return;}
+  tb.innerHTML=elementos.map(e=>`
+    <tr>
+      <td><input value="${e.label}" onchange="updElem(${e.id},'label',this.value)" style="width:90px"></td>
+      <td><input type="number" value="${e.area||''}" placeholder="0" onchange="updElem(${e.id},'area',this.value)"></td>
+      <td><input type="number" value="${e.vu||''}" placeholder="0" onchange="updElem(${e.id},'vu',this.value)" oninput="calcComparativo()"></td>
+      <td><input type="number" value="${e.farea}" step="0.01" onchange="updElem(${e.id},'farea',this.value)"></td>
+      <td><input type="number" value="${e.ftopo}" step="0.01" onchange="updElem(${e.id},'ftopo',this.value)"></td>
+      <td><input type="number" value="${e.fsit}"  step="0.01" onchange="updElem(${e.id},'fsit',this.value)"></td>
+      <td><input type="number" value="${e.floc}"  step="0.01" onchange="updElem(${e.id},'floc',this.value)"></td>
+      <td style="font-weight:700;color:#1b5e20;white-space:nowrap">${fmtN(vuHom(e))} R$/m²</td>
+      <td>${e.fromMap?'<span class="badge badge-blue">mapa</span>':'<span class="badge badge-green">manual</span>'}</td>
+      <td><button class="btn btn-red btn-sm" style="padding:0 6px" onclick="removerElem(${e.id})">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function updElem(id,f,v){const e=elementos.find(x=>x.id===id);if(e)e[f]=f==='label'?v:(parseFloat(v)||0);renderElementos();calcComparativo();}
+function removerElem(id){elementos=elementos.filter(x=>x.id!==id);renderElementos();calcComparativo();}
+
+function calcComparativo() {
+  const area=parseFloat(document.getElementById('ca-area').value)||areaPoligonal||0;
+  const valid=elementos.filter(e=>e.vu>0&&e.area>0);
+  document.getElementById('rc-n').textContent=valid.length;
+  if(!valid.length){
+    ['rc-med','rc-dp','rc-cv'].forEach(id=>document.getElementById(id).textContent='—');
+    document.getElementById('comp-resultado').style.display='none';valComp=0;return;
+  }
+  const vus=valid.map(e=>vuHom(e));
+  const n=vus.length,med=vus.reduce((a,b)=>a+b,0)/n;
+  const dp=n>1?Math.sqrt(vus.reduce((a,v)=>a+(v-med)**2,0)/(n-1)):0;
+  const cv=med>0?dp/med*100:0;
+  document.getElementById('rc-med').textContent=fmtN(med);
+  document.getElementById('rc-dp').textContent=fmtN(dp);
+  document.getElementById('rc-cv').textContent=fmtN(cv,1);
+  if(area>0){
+    valComp=med*area;
+    document.getElementById('comp-resultado').style.display='block';
+    document.getElementById('rc-valor').textContent=fmt(valComp);
+    const cvClass=cv<=15?'CV ≤15% — amostra homogênea':cv<=30?'CV 15-30% — amostra regular':'CV >30% — amostra heterogênea';
+    document.getElementById('rc-info').textContent=`${n} elemento(s) · VU médio: R$ ${fmtN(med)}/m² · ${cvClass}`;
+    document.getElementById('hb-metodo').textContent='Comp: '+fmt(valComp);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// MÉTODO EVOLUTIVO
+// ─────────────────────────────────────────────────────────────
+function addBenfeitoria() {
+  benfeitorias.push({id:Date.now(),desc:'',area:0,cub:0,depr:0});
+  renderBenfeitorias();
+}
+
+function vBenf(b) { return(parseFloat(b.area)||0)*(parseFloat(b.cub)||0)*(1-(parseFloat(b.depr)||0)/100); }
+
+function renderBenfeitorias() {
+  const el=document.getElementById('benf-lista');
+  if(!benfeitorias.length){el.innerHTML='<div style="font-size:12px;color:#aaa;padding:6px">Nenhuma benfeitoria cadastrada.</div>';calcEvolutivo();return;}
+  el.innerHTML=benfeitorias.map((b,i)=>`
+    <div style="border:1px solid #e0e0e0;border-radius:6px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong style="font-size:13px">Benfeitoria ${i+1}</strong>
+        <button class="btn btn-red btn-sm" onclick="removerBenf(${b.id})">✕</button>
+      </div>
+      <div class="form-row">
+        <div style="grid-column:1/-1"><span class="flabel">Descrição</span><input type="text" value="${b.desc}" placeholder="Ex: casa principal, galpão..." class="finput" onchange="updBenf(${b.id},'desc',this.value)"></div>
+      </div>
+      <div class="form-row c3">
+        <div><span class="flabel">Área construída (m²)</span><input type="number" value="${b.area||''}" class="finput" onchange="updBenf(${b.id},'area',this.value)"></div>
+        <div><span class="flabel">CUB unitário (R$/m²)</span><input type="number" value="${b.cub||''}" class="finput" onchange="updBenf(${b.id},'cub',this.value)"></div>
+        <div><span class="flabel">Depreciação (%)</span><input type="number" value="${b.depr||0}" min="0" max="100" class="finput" onchange="updBenf(${b.id},'depr',this.value)"></div>
+      </div>
+      <div style="text-align:right;font-size:12px;color:#555;margin-top:4px">
+        Valor depreciado: <strong style="color:#1b5e20">${fmt(vBenf(b))}</strong>
+      </div>
+    </div>
+  `).join('');
+  calcEvolutivo();
+}
+
+function updBenf(id,f,v){const b=benfeitorias.find(x=>x.id===id);if(b)b[f]=f==='desc'?v:(parseFloat(v)||0);renderBenfeitorias();}
+function removerBenf(id){benfeitorias=benfeitorias.filter(x=>x.id!==id);renderBenfeitorias();}
+
+function calcEvolutivo() {
+  const at=parseFloat(document.getElementById('ea-area').value)||areaPoligonal||0;
+  const vu=parseFloat(document.getElementById('ea-vu').value)||0;
+  const fl=parseFloat(document.getElementById('ea-fl').value)||1;
+  const fc=parseFloat(document.getElementById('ea-fc').value)||1;
+  const dep=parseFloat(document.getElementById('ea-dep').value)||0;
+  const ga=parseFloat(document.getElementById('ea-ga').value)||1;
+  const vt=at*vu*fl;
+  document.getElementById('ev-vt').textContent=fmt(vt);
+  const vb=benfeitorias.reduce((a,b)=>a+vBenf(b),0);
+  document.getElementById('ev-vb').textContent=fmt(vb);
+  const vi=(vt+vb)*(1-dep/100)*ga*fc;
+  valEvol=vi;
+  if(vi>0){
+    document.getElementById('evol-resultado').style.display='block';
+    document.getElementById('ev-valor').textContent=fmt(vi);
+    document.getElementById('ev-info').textContent=`Terreno: ${fmt(vt)} + Benfeitorias: ${fmt(vb)} · Fc: ${fc.toFixed(2)} · Ga: ${ga.toFixed(2)}`;
+    document.getElementById('hb-metodo').textContent='Evol: '+fmt(vi);
+  } else {
+    document.getElementById('evol-resultado').style.display='none';valEvol=0;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// LAUDO FINAL
+// ─────────────────────────────────────────────────────────────
+function syncLaudo() {
+  document.getElementById('ls-vc').textContent=valComp>0?fmt(valComp):'—';
+  document.getElementById('ls-ve').textContent=valEvol>0?fmt(valEvol):'—';
+  document.getElementById('ls-area').textContent=areaPoligonal>0?fmtN(areaPoligonal,2):'—';
+  let va=0;
+  if(valComp>0&&valEvol>0) va=(valComp+valEvol)/2;
+  else if(valComp>0) va=valComp;
+  else if(valEvol>0) va=valEvol;
+  if(va>0&&!document.getElementById('l-val').value) document.getElementById('l-val').value=Math.round(va);
+  preencherCoordsLaudo();
+  updLaudo();
+}
+
+function updLaudo() {
+  const val=parseFloat(document.getElementById('l-val').value)||0;
+  const grau=parseFloat(document.getElementById('l-grau').value)||0.15;
+  const gl=grau===0.10?'Grau I':grau===0.15?'Grau II':'Grau III';
+  if(val>0) document.getElementById('l-intervalo').value=`${fmt(val*(1-grau))} a ${fmt(val*(1+grau))}`;
+  const rows=[
+    ['Área pela poligonal GNSS', areaPoligonal>0?fmtN(areaPoligonal,2)+' m²':'—', amostras.length+' amostra(s) no mapa'],
+    ['Valor pelo M. Comparativo', valComp>0?fmt(valComp):'—', valComp>0?'Calculado — '+elementos.filter(e=>e.vu>0).length+' elem.':'Não informado'],
+    ['Valor pelo M. Evolutivo',   valEvol>0?fmt(valEvol):'—', valEvol>0?'Calculado':'Não informado'],
+    ['Valor adotado',             val>0?fmt(val):'—', 'Adotado para o laudo'],
+    ['Campo de arbítrio inferior',val>0?fmt(val*0.85):'—', '−15%'],
+    ['Campo de arbítrio superior',val>0?fmt(val*1.15):'—', '+15%'],
+    [`Precisão (${gl})`,          `± ${(grau*100).toFixed(0)}%`, 'NBR 14.653'],
+  ];
+  document.getElementById('laudo-tbody').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td style="font-weight:600">${r[1]}</td><td style="color:#666;font-size:12px">${r[2]}</td></tr>`).join('');
+}
+
+function preencherCoordsLaudo() {
+  const tb=document.getElementById('tbody-coords');
+  if(!pontosPoligonal.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#aaa;padding:10px">Nenhuma poligonal calculada.</td></tr>';return;}
+  tb.innerHTML=pontosPoligonal.map((p,i)=>{
+    const nx=pontosPoligonal[(i+1)%pontosPoligonal.length];
+    const dist=L.latLng(p.lat,p.lon).distanceTo(L.latLng(nx.lat,nx.lon));
+    const az=(Math.atan2(nx.lon-p.lon,nx.lat-p.lat)*180/Math.PI+360)%360;
+    return `<tr><td><strong>${p.label||p.nome}</strong></td><td>${formatarDMS(p.latDMS)}</td><td>${formatarDMS(p.lonDMS)}</td><td>${p.alt!=null?parseFloat(p.alt).toFixed(2):'—'}</td><td>${azimutePorExtenso(az)}</td><td>${dist.toFixed(2)}</td></tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// IMPRESSÃO / MEMORIAL (compatibilidade retroativa)
+// ─────────────────────────────────────────────────────────────
+function gerarMemorial() { prepararEExportar('imprimir'); }
+
+// ─────────────────────────────────────────────────────────────
+// EXPORTAR KML
+// ─────────────────────────────────────────────────────────────
+function exportarKMLpoli() {
+  if(!pontosPoligonal.length){alert('Nenhuma poligonal para exportar.');return;}
+  const marks=pontosPoligonal.map(p=>`  <Placemark><name>${p.nome}</name><Point><coordinates>${p.lon},${p.lat},${p.alt||0}</coordinates></Point></Placemark>`).join('\n');
+  const coords=[...pontosPoligonal,pontosPoligonal[0]].map(p=>`${p.lon},${p.lat},0`).join(' ');
+  const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n  <name>Poligonal Avaliando</name>\n${marks}\n  <Placemark><name>Poligonal</name><Polygon><outerBoundaryIs><LinearRing><coordinates>${coords}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>\n</Document>\n</kml>`;
+  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([kml],{type:'application/vnd.google-earth.kml+xml'})),download:'poligonal_avaliacao.kml'});
+  document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(a.href);},100);
+}
+
+// ─────────────────────────────────────────────────────────────
+// FORMATADORES
+// ─────────────────────────────────────────────────────────────
+function fmt(v){if(!v&&v!==0)return'—';return'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtN(v,d=2){if(v===null||v===undefined)return'—';return v.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});}
+
+function atualizarBadges() {
+  document.getElementById('badge-am-count').textContent=amostras.length;
+  document.getElementById('hb-amostras').textContent='Amostras: '+amostras.length;
+}
+
+// ─────────────────────────────────────────────────────────────
+// ALTITUDE BASE
+// ─────────────────────────────────────────────────────────────
+function aplicarAltBase() {
+  const alt = parseFloat(document.getElementById('altBase').value) || 0;
+  pontosPoligonal.forEach(p => { if (!p.alt || p.alt === 0) p.alt = alt; });
+  renderListaVertices();
+}
+
+// ─────────────────────────────────────────────────────────────
+// CAPTURA DO MAPA (leaflet-image via CDN)
+// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// MAPA ESTÁTICO — Bing Maps (satélite HD) com fallback OSM
+// ─────────────────────────────────────────────────────────────
+let mapaCapturadoDataUrl = null;
+
+// Persiste a chave Bing no localStorage para não precisar redigitar
+function salvarBingKey(val) {
+  try { localStorage.setItem('geoSistemaBingKey', val.trim()); } catch(e) {}
+}
+function _getBingKey() {
+  const campo = document.getElementById('bingKey');
+  if (campo && campo.value.trim()) return campo.value.trim();
+  try { return localStorage.getItem('geoSistemaBingKey') || ''; } catch(e) { return ''; }
+}
+
+// ─── Zoom automático baseado na extensão ───
+function _calcZoomEstatico() {
+  if (!pontosPoligonal.length) return 16;
+  const lats = pontosPoligonal.map(p => p.lat);
+  const lons = pontosPoligonal.map(p => p.lon);
+  const delta = Math.max(Math.max(...lats)-Math.min(...lats), Math.max(...lons)-Math.min(...lons));
+  if (delta < 0.001) return 18;
+  if (delta < 0.003) return 17;
+  if (delta < 0.008) return 16;
+  if (delta < 0.02)  return 15;
+  if (delta < 0.06)  return 14;
+  if (delta < 0.15)  return 13;
+  return 12;
+}
+
+// ─── Gera URL Mapbox Static (satélite) ───
+// Docs: https://docs.mapbox.com/api/maps/static-images/
+function _gerarUrlBing(key) {
+  if (!pontosPoligonal.length || !key) return null;
+
+  const lats = pontosPoligonal.map(p => p.lat);
+  const lons  = pontosPoligonal.map(p => p.lon);
+  const cLat  = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const cLon  = (Math.min(...lons) + Math.max(...lons)) / 2;
+  const zoom  = _calcZoomEstatico();
+
+  // GeoJSON overlay: poligonal + marcadores como FeatureCollection
+  const polyCoords = [...pontosPoligonal, pontosPoligonal[0]]
+    .map(p => [parseFloat(p.lon.toFixed(6)), parseFloat(p.lat.toFixed(6))]);
+
+  const markerFeatures = pontosPoligonal.map(p => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [parseFloat(p.lon.toFixed(6)), parseFloat(p.lat.toFixed(6))] },
+    properties: {}
+  }));
+
+  const geojson = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [polyCoords] },
+        properties: { stroke: '#1a73e8', 'stroke-width': 3, 'stroke-opacity': 0.9, fill: '#1a73e8', 'fill-opacity': 0.1 }
+      },
+      ...markerFeatures
+    ]
+  };
+
+  const geojsonEncoded = encodeURIComponent(JSON.stringify(geojson));
+
+  // Mapbox Static Images API:
+  // /styles/v1/{username}/{style_id}/static/geojson({geojson})/{lon},{lat},{zoom}/{width}x{height}
+  return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static`
+    + `/geojson(${geojsonEncoded})`
+    + `/${cLon.toFixed(6)},${cLat.toFixed(6)},${zoom},0`
+    + `/800x450`
+    + `?access_token=${key}`
+    + `&attribution=false&logo=false`;
+}
+
+// ─── Gera URL OSM estático (fallback sem chave) ───
+function _gerarUrlMapaEstatico() {
+  if (!pontosPoligonal.length) return null;
+  const lats = pontosPoligonal.map(p => p.lat);
+  const lons  = pontosPoligonal.map(p => p.lon);
+  const cLat  = ((Math.min(...lats) + Math.max(...lats)) / 2).toFixed(6);
+  const cLon  = ((Math.min(...lons) + Math.max(...lons)) / 2).toFixed(6);
+  const zoom  = _calcZoomEstatico();
+  const polyline = [...pontosPoligonal, pontosPoligonal[0]]
+    .map(p => `${p.lat.toFixed(6)},${p.lon.toFixed(6)}`).join('|');
+  const mkList = pontosPoligonal
+    .map((p, i) => `${p.lat.toFixed(6)},${p.lon.toFixed(6)},lightblue1,${p.label||p.nome||('V'+(i+1))}`)
+    .join('|');
+  return 'https://staticmap.openstreetmap.de/staticmap.php'
+    + `?center=${cLat},${cLon}&zoom=${zoom}&size=800x450&maptype=mapnik`
+    + `&polyline=color:0x1a73e8CC|weight:3|fillcolor:0x1a73e822|${polyline}`
+    + (mkList ? `&markers=${mkList}` : '');
+}
+
+// ─── Baixa imagem e converte para dataURL ───
+function _buscarMapaComoDataUrl(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width  = img.naturalWidth  || 800;
+        canvas.height = img.naturalHeight || 450;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.95));
+      } catch(e) { resolve(url); } // tainted canvas — devolve URL pura
+    };
+    img.onerror = () => reject(new Error('Imagem não carregou'));
+    // Cache-bust para forçar nova requisição
+    img.src = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
+  });
+}
+
+// ─── Captura principal — tenta Bing primeiro, cai no OSM ───
+function capturarMapaParaLaudo() {
+  if (!pontosPoligonal.length) { alert('Adicione a poligonal antes de capturar.'); return; }
+  const btn = document.getElementById('btn-cap-mapa');
+  btn.textContent = '⏳ Buscando mapa...'; btn.disabled = true;
+
+  const bingKey = _getBingKey();
+  const urlBing = _gerarUrlBing(bingKey);
+  const urlOSM  = _gerarUrlMapaEstatico();
+
+  // Preenche o campo da chave se veio do localStorage
+  const campoKey = document.getElementById('bingKey');
+  if (campoKey && !campoKey.value && bingKey) campoKey.value = bingKey;
+
+  const tentarUrl = (url, fonte) => _buscarMapaComoDataUrl(url)
+    .then(dataUrl => {
+      mapaCapturadoDataUrl = dataUrl;
+      document.getElementById('img-mapa-preview').src = dataUrl;
+      document.getElementById('preview-mapa-capturado').style.display = 'block';
+      // Mostra qual fonte foi usada
+      const info = document.querySelector('#preview-mapa-capturado div');
+      if (info) info.textContent = `✓ Mapa capturado (${fonte}) — será incluído no laudo`;
+      btn.textContent = '📷 Capturar mapa (satélite)'; btn.disabled = false;
+    });
+
+  const promessa = urlBing
+    ? tentarUrl(urlBing, 'Mapbox Satellite').catch(() => {
+        console.warn('Mapbox falhou, tentando OSM...');
+        return urlOSM ? tentarUrl(urlOSM, 'OpenStreetMap') : Promise.reject();
+      })
+    : (urlOSM ? tentarUrl(urlOSM, 'OpenStreetMap') : Promise.reject(new Error('Sem URL')));
+
+  promessa.catch(() => {
+    btn.textContent = '📷 Capturar mapa (satélite)'; btn.disabled = false;
+    alert('Não foi possível carregar o mapa.\n\nVerifique:\n• O token Mapbox começa com pk.eyJ1...\n• Você está conectado à internet\n\nO laudo incluirá a planta esquemática automaticamente.');
+  });
+}
+
+function limparMapaCapturado() {
+  mapaCapturadoDataUrl = null;
+  document.getElementById('preview-mapa-capturado').style.display = 'none';
+  document.getElementById('img-mapa-preview').src = '';
+}
+
+// Restaura chave Bing do localStorage ao carregar
+window.addEventListener('load', () => {
+  try {
+    const k = localStorage.getItem('geoSistemaBingKey');
+    if (k) { const el = document.getElementById('bingKey'); if (el) el.value = k; }
+  } catch(e) {}
+});
+
+// ─────────────────────────────────────────────────────────────
+// FOTOS DO IMÓVEL — lista compacta na interface, grade no laudo
+// ─────────────────────────────────────────────────────────────
+let fotosImovel = [];
+const LEGENDAS_SUGERIDAS = [
+  'Vista frontal do imóvel','Vista lateral direita','Vista lateral esquerda',
+  'Vista dos fundos','Vista aérea / panorâmica','Detalhe da topografia',
+  'Acesso principal','Confrontante frontal','Confrontante lateral',
+  'Detalhe da vegetação','Infraestrutura do entorno','Vista geral da área'
+];
+
+function adicionarFotos(input) {
+  const files = Array.from(input.files);
+  if (fotosImovel.length + files.length > 12) { alert('Máximo de 12 fotos.'); return; }
+  const promises = files.map((file, fi) => new Promise(res => {
+    const r = new FileReader();
+    r.onload = e => {
+      const idx = fotosImovel.length + fi;
+      fotosImovel.push({
+        id: Date.now()+Math.random(),
+        dataUrl: e.target.result,
+        legenda: LEGENDAS_SUGERIDAS[idx] || ''
+      });
+      res();
+    };
+    r.readAsDataURL(file);
+  }));
+  Promise.all(promises).then(renderFotos);
+  input.value = '';
+}
+
+function renderFotos() {
+  // grade antiga (pode não existir mais)
+  const grid = document.getElementById('fotos-grid');
+  if (grid) grid.innerHTML = '';
+
+  // lista compacta na aba laudo
+  const lista = document.getElementById('fotos-lista-compacta');
+  if (!lista) return;
+  if (!fotosImovel.length) {
+    lista.innerHTML = '<div style="font-size:12px;color:#aaa;text-align:center;padding:8px">Nenhuma foto adicionada.</div>';
+    return;
+  }
+  lista.innerHTML = fotosImovel.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0">
+      <img src="${f.dataUrl}" style="width:48px;height:36px;object-fit:cover;border-radius:3px;border:1px solid #ddd;flex-shrink:0">
+      <input type="text" value="${f.legenda.replace(/"/g,'&quot;')}" placeholder="Legenda..."
+             oninput="fotosImovel[${i}].legenda=this.value"
+             style="flex:1;height:28px;border:1px solid #ddd;border-radius:3px;padding:0 7px;font-size:12px">
+      <button onclick="removerFoto(${i})" style="background:none;border:none;cursor:pointer;color:#dc3545;font-size:14px;padding:0 4px;flex-shrink:0">✕</button>
+    </div>
+  `).join('') + `<div style="font-size:11px;color:#777;margin-top:6px">${fotosImovel.length} foto(s) — serão exibidas em grade 2×2 no laudo</div>`;
+}
+
+function removerFoto(i) { fotosImovel.splice(i, 1); renderFotos(); }
+
+// ─────────────────────────────────────────────────────────────
+// EXPORTAÇÃO PDF com html2pdf.js
+// ─────────────────────────────────────────────────────────────
+function carregarHtml2pdf(cb) {
+  if (window.html2pdf) { cb(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+  s.onload = cb;
+  s.onerror = () => { alert('Falha ao carregar html2pdf. Verifique sua conexão.'); };
+  document.head.appendChild(s);
+}
+
+function exportarPDF() {
+  const el = document.getElementById('area-print');
+  if (!el || !el.innerHTML.trim()) {
+    alert('Clique em "Imprimir / salvar como PDF" primeiro para preparar o laudo.');
+    return;
+  }
+  const proprietario = document.getElementById('nomeProprietario')?.value || 'laudo';
+  const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+  const nomeArq = `avaliacao_${proprietario.split(' ')[0]}_${hoje}.pdf`;
+
+  const btnPDF = document.getElementById('btn-exportar-pdf');
+  if (btnPDF) { btnPDF.textContent = 'Gerando PDF...'; btnPDF.disabled = true; }
+
+  carregarHtml2pdf(() => {
+    // O html2canvas exige que o elemento seja visível no DOM para capturar o conteúdo.
+    // Colocamos o clone em uma posição fora da tela mas visível (não display:none).
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;min-height:100px;background:#fff;z-index:-9999;overflow:visible';
+    const clone = el.cloneNode(true);
+    clone.style.cssText = 'font-family:Times New Roman,serif;font-size:11pt;line-height:1.6;color:#000;background:#fff;padding:20px;margin:0;display:block;width:100%';
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+
+    html2pdf().set({
+      margin: [15, 15, 15, 15],
+      filename: nomeArq,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0, backgroundColor: '#ffffff', logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css','legacy'], before: '.print-break' }
+    }).from(clone).save().then(() => {
+      document.body.removeChild(wrapper);
+      if (btnPDF) { btnPDF.textContent = 'Exportar PDF (download direto)'; btnPDF.disabled = false; }
+    }).catch(err => {
+      if (document.body.contains(wrapper)) document.body.removeChild(wrapper);
+      console.error(err);
+      if (btnPDF) { btnPDF.textContent = 'Exportar PDF (download direto)'; btnPDF.disabled = false; }
+      alert('Erro ao gerar PDF. Tente a opção Imprimir como alternativa.');
+    });
+  });
+}
+
+function prepararEExportar(acao) {
+  if(pontosPoligonal.length < 3){ alert('Calcule a poligonal com pelo menos 3 vértices antes de gerar o laudo.'); return; }
+
+  // Botão de feedback
+  const btnPDF  = document.getElementById('btn-exportar-pdf');
+  const btnImp  = document.querySelector('.btn-green[onclick*="imprimir"]');
+  const btnAtivo = acao === 'pdf' ? btnPDF : btnImp;
+  const origLabel = btnAtivo ? btnAtivo.textContent : '';
+  const _setBusy = (msg) => { if(btnAtivo){ btnAtivo.textContent=msg; btnAtivo.disabled=true; } };
+  const _setFree = ()    => { if(btnAtivo){ btnAtivo.textContent=origLabel; btnAtivo.disabled=false; } };
+
+  const _finalizar = () => {
+    _construirHtmlLaudo();
+    if (acao === 'pdf') setTimeout(exportarPDF, 300);
+    else setTimeout(() => window.print(), 600);
+  };
+
+  // Se mapa já foi capturado manualmente — vai direto, não sobrescreve
+  if (mapaCapturadoDataUrl) {
+    _finalizar();
+    return;
+  }
+
+  // Sem mapa: tenta carregar automaticamente (Mapbox se tiver chave, senão OSM)
+  const bingKey = _getBingKey();
+  const urlAuto = _gerarUrlBing(bingKey) || _gerarUrlMapaEstatico();
+
+  if (urlAuto) {
+    _setBusy('⏳ Carregando mapa...');
+    _buscarMapaComoDataUrl(urlAuto)
+      .then(dataUrl => {
+        mapaCapturadoDataUrl = dataUrl;
+        const prev = document.getElementById('img-mapa-preview');
+        if (prev) prev.src = dataUrl;
+        document.getElementById('preview-mapa-capturado').style.display = 'block';
+        const info = document.querySelector('#preview-mapa-capturado div');
+        if (info) info.textContent = '✓ Mapa carregado automaticamente';
+      })
+      .catch(() => { /* sem mapa — laudo usa moldura vazia */ })
+      .finally(() => { _setFree(); _finalizar(); });
+    return;
+  }
+
+  _finalizar();
+}
+
+function _construirHtmlLaudo() {
+  const proprietario=document.getElementById('nomeProprietario')?.value||'NÃO INFORMADO';
+  const matricula=document.getElementById('matriculaImovel')?.value||'NÃO INFORMADA';
+  const municipio=document.getElementById('nomeMunicipio')?.value||'___________';
+  const comarca=document.getElementById('nomeComarca')?.value||'___________';
+  const datum=document.getElementById('nomeDatum')?.value||'SIRGAS 2000';
+  const rt=document.getElementById('nomeRT')?.value||'RESPONSÁVEL TÉCNICO';
+  const crea=document.getElementById('numCREA')?.value||'___________';
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  const areaStr=document.getElementById('txtArea')?.textContent||'—';
+  const periStr=document.getElementById('txtPeri')?.textContent||'—';
+  const val=parseFloat(document.getElementById('l-val')?.value)||0;
+  const finalidade=document.getElementById('l-fin')?.value||'—';
+
+  const ST = (s) => `style="${s}"`;
+  const TD = (s='') => `style="border:1pt solid #000;padding:4pt;${s}"`;
+  const TH = (s='') => `style="border:1pt solid #000;padding:4pt;background:#f0f0f0;${s}"`;
+
+  let html=`<div ${ST('max-width:21cm;margin:0 auto;font-family:Times New Roman,serif;font-size:11pt;line-height:1.6;color:#000')}>`;
+
+  // ── CAPA ──
+  html+=`<div ${ST('min-height:26cm;border:2pt solid #000;display:flex;flex-direction:column;justify-content:space-between;padding:30pt;text-align:center;page-break-after:always')}>
+    <div>
+      <div ${ST('font-size:22pt;font-weight:bold;color:#1a73e8;margin-bottom:6pt')}>GEOSISTEMA PRO</div>
+      <div ${ST('font-size:10pt;color:#555;margin-bottom:40pt')}>Engenharia e Agrimensura | Georreferenciamento e Avaliação Imobiliária</div>
+    </div>
+    <div>
+      <div ${ST('font-size:16pt;font-weight:bold;margin-bottom:8pt')}>LAUDO DE AVALIAÇÃO IMOBILIÁRIA</div>
+      <div ${ST('font-size:12pt;color:#333;margin-bottom:4pt')}>${proprietario}</div>
+      <div ${ST('font-size:10pt;color:#555')}>Matrícula: ${matricula}</div>
+      <div ${ST('font-size:10pt;color:#555')}>Município de ${municipio} — Comarca de ${comarca}</div>
+    </div>
+    <div ${ST('font-size:10pt;color:#555;border-top:1pt solid #ccc;padding-top:12pt')}>
+      <p ${ST('margin:2pt 0')}>Finalidade: <b>${finalidade}</b></p>
+      <p ${ST('margin:2pt 0')}>Responsável Técnico: <b>${rt}</b> &nbsp;|&nbsp; CREA/CFT: <b>${crea}</b></p>
+      <p ${ST('margin:2pt 0')}>Datum: <b>${datum}</b> &nbsp;|&nbsp; Data: <b>${hoje}</b></p>
+    </div>
+  </div>`;
+
+  // ── IDENTIFICAÇÃO ──
+  html+=`<div ${ST('page-break-before:always')}>
+  <div ${ST('display:flex;justify-content:space-between;border-bottom:2pt solid #1a73e8;padding-bottom:8pt;margin-bottom:14pt')}>
+    <div><div ${ST('font-size:14pt;font-weight:bold;color:#1a73e8')}>GEOSISTEMA PRO</div>
+    <div ${ST('font-size:8pt;color:#777')}>Avaliação Imobiliária | NBR 14.653</div></div>
+    <div ${ST('text-align:right;font-size:9pt;color:#555')}>Emitido em: <b>${hoje}</b><br>Datum: <b>${datum}</b></div>
+  </div>
+  <h3 ${ST('text-align:center;font-size:13pt;margin:0 0 4pt')}>IDENTIFICAÇÃO DO IMÓVEL E DADOS CADASTRAIS</h3>
+  <p ${ST('text-align:center;font-size:9pt;color:#555;margin:0 0 12pt')}>Município: <b>${municipio}</b> &nbsp;|&nbsp; Comarca: <b>${comarca}</b> &nbsp;|&nbsp; Finalidade: <b>${finalidade}</b></p>
+  <table ${ST('width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:14pt')}>
+    <tr><th ${TH('width:28%')}>Proprietário</th><td ${TD()} colspan="3">${proprietario}</td></tr>
+    <tr><th ${TH()}>Matrícula</th><td ${TD()}>${matricula}</td><th ${TH('width:22%')}>Área Total</th><td ${TD()}>${areaStr}</td></tr>
+    <tr><th ${TH()}>Perímetro</th><td ${TD()}>${periStr}</td><th ${TH()}>Sistema Geodésico</th><td ${TD()}>${datum}</td></tr>
+    <tr><th ${TH()}>Vértices</th><td ${TD()}>${pontosPoligonal.length}</td><th ${TH()}>Amostras utilizadas</th><td ${TD()}>${amostras.length}</td></tr>
+  </table>`;
+
+  // Mapa capturado
+  // ── VISTORIA DO IMÓVEL ──
+  const vData   = document.getElementById('v-data')?.value  || '';
+  const vHora   = document.getElementById('v-hora')?.value  || '';
+  const vResp   = document.getElementById('v-resp')?.value  || '';
+  const vAcesso = document.getElementById('v-acesso')?.value|| '';
+  const vOcup   = document.getElementById('v-ocup')?.value  || '';
+  const vObs    = document.getElementById('v-obs')?.value   || '';
+  const vDataFmt = vData ? new Date(vData+'T12:00:00').toLocaleDateString('pt-BR') : '___/___/______';
+
+  html += `<div ${ST('margin-bottom:14pt;page-break-inside:avoid')}>
+    <h4 ${ST('margin:0 0 6pt;font-size:11pt;border-bottom:1pt solid #eee;padding-bottom:4pt')}>VISTORIA DO IMÓVEL</h4>
+    <table ${ST('width:100%;border-collapse:collapse;font-size:10pt')}>
+      <tr>
+        <th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa;width:25%')}>Data da vistoria</th>
+        <td ${ST('border:1pt solid #ddd;padding:4pt')}>${vDataFmt}${vHora?' às '+vHora:''}</td>
+        <th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa;width:25%')}>Responsável</th>
+        <td ${ST('border:1pt solid #ddd;padding:4pt')}>${vResp||'—'}</td>
+      </tr>
+      <tr>
+        <th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa')}>Condições de acesso</th>
+        <td ${ST('border:1pt solid #ddd;padding:4pt')}>${vAcesso||'—'}</td>
+        <th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa')}>Situação de ocupação</th>
+        <td ${ST('border:1pt solid #ddd;padding:4pt')}>${vOcup||'—'}</td>
+      </tr>
+      ${vObs ? `<tr><th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa')}>Observações</th><td ${ST('border:1pt solid #ddd;padding:4pt')} colspan="3">${vObs.replace(/\n/g,'<br>')}</td></tr>` : ''}
+    </table>
+  </div>`;
+
+  // ── FATORES DE VALORIZAÇÃO / DEPRECIAÇÃO ──
+  const fatPadrao = document.getElementById('fat-padrao')?.value || '';
+  const fatInfra  = document.getElementById('fat-infra')?.value  || '';
+  const fatTopo   = document.getElementById('fat-topo')?.value   || '';
+  const fatVeg    = document.getElementById('fat-veg')?.value    || '';
+  const fatCons   = document.getElementById('fat-cons')?.value   || '';
+  const fatObs    = document.getElementById('fat-obs')?.value    || '';
+
+  html += `<div ${ST('margin-bottom:14pt;page-break-inside:avoid')}>
+    <h4 ${ST('margin:0 0 6pt;font-size:11pt;border-bottom:1pt solid #eee;padding-bottom:4pt')}>FATORES DE VALORIZAÇÃO E DEPRECIAÇÃO</h4>
+    <table ${ST('width:100%;border-collapse:collapse;font-size:10pt')}>
+      <tr>
+        <th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa;width:30%')}>Padrão / Uso do solo</th>
+        <td ${ST('border:1pt solid #ddd;padding:4pt')}>${fatPadrao||'—'}</td>
+        <th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa;width:22%')}>Infraestrutura</th>
+        <td ${ST('border:1pt solid #ddd;padding:4pt')}>${fatInfra||'—'}</td>
+      </tr>
+      <tr>
+        <th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa')}>Topografia</th>
+        <td ${ST('border:1pt solid #ddd;padding:4pt')}>${fatTopo||'—'}</td>
+        <th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa')}>Vegetação</th>
+        <td ${ST('border:1pt solid #ddd;padding:4pt')}>${fatVeg||'—'}</td>
+      </tr>
+      <tr>
+        <th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa')}>Estado de conservação</th>
+        <td ${ST('border:1pt solid #ddd;padding:4pt')} colspan="3">${fatCons||'—'}</td>
+      </tr>
+      ${fatObs ? `<tr><th ${ST('border:1pt solid #ddd;padding:4pt;background:#f8f9fa')}>Fatores adicionais</th><td ${ST('border:1pt solid #ddd;padding:4pt')} colspan="3">${fatObs.replace(/\n/g,'<br>')}</td></tr>` : ''}
+    </table>
+  </div>`;
+
+  // ── FONTES DAS AMOSTRAS ──
+  const fontesRows = fontes.map((f,i) => `
+    <tr ${i%2===0?'':ST('background:#fafafa')}>
+      <td ${ST('border:1pt solid #ddd;padding:4pt;text-align:center;font-weight:bold')}>${i+1}</td>
+      <td ${ST('border:1pt solid #ddd;padding:4pt')}>${f.origem||'—'}</td>
+      <td ${ST('border:1pt solid #ddd;padding:4pt')}>${f.tipo||'—'}</td>
+      <td ${ST('border:1pt solid #ddd;padding:4pt')}>${f.data||'—'}</td>
+      <td ${ST('border:1pt solid #ddd;padding:4pt')}>${f.contato||'—'}</td>
+    </tr>`).join('');
+
+  if (fontes.length) {
+    html += `<div ${ST('margin-bottom:14pt;page-break-inside:avoid')}>
+      <h4 ${ST('margin:0 0 6pt;font-size:11pt;border-bottom:1pt solid #eee;padding-bottom:4pt')}>FONTES DOS DADOS COMPARATIVOS</h4>
+      <table ${ST('width:100%;border-collapse:collapse;font-size:9.5pt')}>
+        <thead><tr style="background:#1a73e8;color:#fff">
+          <th ${ST('border:1pt solid #1a73e8;padding:4pt;width:30pt;text-align:center')}>#</th>
+          <th ${ST('border:1pt solid #1a73e8;padding:4pt')}>Origem / Identificação</th>
+          <th ${ST('border:1pt solid #1a73e8;padding:4pt')}>Tipo</th>
+          <th ${ST('border:1pt solid #1a73e8;padding:4pt')}>Data</th>
+          <th ${ST('border:1pt solid #1a73e8;padding:4pt')}>Contato / Referência</th>
+        </tr></thead>
+        <tbody>${fontesRows}</tbody>
+      </table>
+    </div>`;
+  }
+
+    // ── PLANTA DE SITUAÇÃO — moldura fixa com instruções ──
+  html += `<div ${ST('margin-bottom:14pt;page-break-inside:avoid')}>
+    <div ${ST('font-size:9pt;font-weight:bold;color:#555;margin-bottom:4pt;border-bottom:0.5pt solid #ccc;padding-bottom:3pt;letter-spacing:.04em')}>PLANTA DE SITUAÇÃO — POLIGONAL DO AVALIANDO</div>` +
+    (mapaCapturadoDataUrl
+      ? `<img src="${mapaCapturadoDataUrl}" ${ST('width:100%;height:200pt;object-fit:contain;border:0.5pt solid #ccc;display:block;border-radius:2pt')}>`
+      : `<div ${ST('width:100%;height:200pt;border:1.5pt dashed #aab;border-radius:4pt;background:#f8f9fc;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8pt;box-sizing:border-box')}>
+          <div ${ST('font-size:28pt;opacity:.18')}>🗺️</div>
+          <div ${ST('font-size:10pt;font-weight:bold;color:#8899aa;letter-spacing:.05em')}>COLE O MAPA AQUI</div>
+          <div ${ST('font-size:8pt;color:#aab;text-align:center;max-width:280pt;line-height:1.5')}>Recorte a imagem do mapa na escala adequada e cole neste espaço</div>
+        </div>`
+    ) +
+    `<p ${ST('font-size:7pt;color:#888;text-align:center;margin:3pt 0 0')}>Fonte: Mapbox Satellite / OpenStreetMap contributors | Sistema de coordenadas: ${datum}</p>
+  </div>`;
+
+    // ── MEMORIAL DESCRITIVO ──
+  html+=`<h4 ${ST('margin:0 0 6pt;font-size:11pt;border-bottom:1pt solid #eee;padding-bottom:4pt')}>MEMORIAL DESCRITIVO</h4>`;
+  const p0=pontosPoligonal[0];
+  html+=`<p ${ST('text-align:justify;margin-bottom:8pt;font-size:10pt')}>Inicia-se a descrição deste perímetro no vértice <b>${p0.label||p0.nome}</b>, de coordenadas Latitude <b>${formatarDMS(p0.latDMS)}</b> e Longitude <b>${formatarDMS(p0.lonDMS)}</b>, altitude <b>${p0.alt!=null?parseFloat(p0.alt).toFixed(2)+'m':'—'}</b>, referenciadas ao Sistema Geodésico Brasileiro (<b>${datum}</b>), Município de <b>${municipio}</b>, Comarca de <b>${comarca}</b>, sob matrícula nº <b>${matricula}</b>.</p>`;
+  html+=`<p ${ST('text-align:justify;font-size:10pt;margin-bottom:12pt')}>`;
+  for(let i=0;i<pontosPoligonal.length;i++){
+    const p1=pontosPoligonal[i],p2=pontosPoligonal[(i+1)%pontosPoligonal.length];
+    const dist=L.latLng(p1.lat,p1.lon).distanceTo(L.latLng(p2.lat,p2.lon));
+    const az=(Math.atan2(p2.lon-p1.lon,p2.lat-p1.lat)*180/Math.PI+360)%360;
+    html+=`Deste, segue confrontando, com azimute <b>${azimutePorExtenso(az)}</b>, distância de <b>${dist.toFixed(2)}m</b>, até o vértice <b>${p2.label||p2.nome}</b> (Lat <b>${formatarDMS(p2.latDMS)}</b>, Lon <b>${formatarDMS(p2.lonDMS)}</b>); `;
+  }
+  html+=`</p></div>`;
+
+  // ── QUADRO DE COORDENADAS ──
+  html+=`<div ${ST('page-break-before:always')}>
+  <div ${ST('display:flex;justify-content:space-between;border-bottom:1pt solid #ddd;padding-bottom:6pt;margin-bottom:10pt')}>
+    <b ${ST('font-size:10pt')}>GEOSISTEMA PRO — Avaliação Imobiliária</b>
+    <span ${ST('font-size:8pt;color:#777')}>${hoje} | ${datum}</span>
+  </div>
+  <h4 ${ST('margin:0 0 8pt;font-size:11pt')}>QUADRO DE COORDENADAS — ${datum}</h4>
+  <table ${ST('width:100%;border-collapse:collapse;font-size:9pt')}>
+  <thead><tr ${ST('background:#1a73e8;color:#fff')}>
+    <th ${ST('border:1pt solid #1a73e8;padding:4pt;text-align:center')}>Vértice</th>
+    <th ${ST('border:1pt solid #1a73e8;padding:4pt')}>Latitude</th>
+    <th ${ST('border:1pt solid #1a73e8;padding:4pt')}>Longitude</th>
+    <th ${ST('border:1pt solid #1a73e8;padding:4pt;text-align:center')}>Alt (m)</th>
+    <th ${ST('border:1pt solid #1a73e8;padding:4pt')}>Azimute → próx.</th>
+    <th ${ST('border:1pt solid #1a73e8;padding:4pt;text-align:center')}>Dist (m)</th>
+  </tr></thead><tbody>`;
+  pontosPoligonal.forEach((p,i)=>{
+    const nx=pontosPoligonal[(i+1)%pontosPoligonal.length];
+    const dist=L.latLng(p.lat,p.lon).distanceTo(L.latLng(nx.lat,nx.lon));
+    const az=(Math.atan2(nx.lon-p.lon,nx.lat-p.lat)*180/Math.PI+360)%360;
+    const bg = i%2===0 ? '#fff' : '#f7f9fc';
+    html+=`<tr ${ST('background:'+bg)}><td ${ST('border:1pt solid #ddd;padding:3pt;text-align:center;font-weight:bold')}>${p.label||p.nome}</td><td ${ST('border:1pt solid #ddd;padding:3pt')}>${formatarDMS(p.latDMS)}</td><td ${ST('border:1pt solid #ddd;padding:3pt')}>${formatarDMS(p.lonDMS)}</td><td ${ST('border:1pt solid #ddd;padding:3pt;text-align:center')}>${p.alt!=null?parseFloat(p.alt).toFixed(2):'—'}</td><td ${ST('border:1pt solid #ddd;padding:3pt')}>${azimutePorExtenso(az)}</td><td ${ST('border:1pt solid #ddd;padding:3pt;text-align:center')}>${dist.toFixed(2)}</td></tr>`;
+  });
+  html+=`</tbody></table></div>`;
+
+  // ── SÍNTESE DA AVALIAÇÃO ──
+  if(val>0||valComp>0||valEvol>0){
+    const grau=parseFloat(document.getElementById('l-grau')?.value)||0.15;
+    const gl=grau===0.10?'Grau I':grau===0.15?'Grau II':'Grau III';
+    html+=`<div ${ST('page-break-before:always')}>
+    <div ${ST('display:flex;justify-content:space-between;border-bottom:1pt solid #ddd;padding-bottom:6pt;margin-bottom:10pt')}>
+      <b ${ST('font-size:10pt')}>GEOSISTEMA PRO — Avaliação Imobiliária</b>
+      <span ${ST('font-size:8pt;color:#777')}>${hoje} | NBR 14.653</span>
+    </div>
+    <h4 ${ST('margin:0 0 8pt;font-size:11pt')}>SÍNTESE DA AVALIAÇÃO — NBR 14.653</h4>
+    <table ${ST('width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:16pt')}>
+      <thead><tr ${ST('background:#1a73e8;color:#fff')}>
+        <th ${ST('border:1pt solid #1a73e8;padding:5pt;text-align:left;width:65%')}>Item</th>
+        <th ${ST('border:1pt solid #1a73e8;padding:5pt;text-align:right')}>Valor apurado</th>
+      </tr></thead>
+      <tbody>
+      <tr><td ${TD()}>Área pela poligonal GNSS</td><td ${TD('text-align:right')}>${areaStr}</td></tr>
+      <tr ${ST('background:#f9f9f9')}><td ${TD()}>Valor pelo Método Comparativo Direto</td><td ${TD('text-align:right;font-weight:bold')}>${valComp>0?fmt(valComp):'—'}</td></tr>
+      <tr><td ${TD()}>Valor pelo Método Evolutivo</td><td ${TD('text-align:right;font-weight:bold')}>${valEvol>0?fmt(valEvol):'—'}</td></tr>
+      <tr ${ST('background:#e8f5e9')}><td ${TD('font-weight:bold;font-size:11pt')}>VALOR ADOTADO PARA O LAUDO</td><td ${TD('text-align:right;font-weight:bold;font-size:13pt;color:#1b5e20')}>${val>0?fmt(val):'—'}</td></tr>
+      <tr><td ${TD()}>Campo de arbítrio inferior (−${(grau*100).toFixed(0)}%)</td><td ${TD('text-align:right')}>${val>0?fmt(val*(1-grau)):'—'}</td></tr>
+      <tr ${ST('background:#f9f9f9')}><td ${TD()}>Campo de arbítrio superior (+${(grau*100).toFixed(0)}%)</td><td ${TD('text-align:right')}>${val>0?fmt(val*(1+grau)):'—'}</td></tr>
+      <tr><td ${TD()}>Grau de precisão (${gl})</td><td ${TD('text-align:right')}>± ${(grau*100).toFixed(0)}%</td></tr>
+      </tbody>
+    </table>
+    <div ${ST('display:flex;justify-content:space-around;margin-top:50pt;page-break-inside:avoid')}>
+      <div ${ST('width:40%;text-align:center')}><div ${ST('border-top:1pt solid #000;margin-bottom:5pt')}></div><b>${rt}</b><br><span ${ST('font-size:9pt')}>Responsável Técnico<br>CREA/CFT: ${crea}</span></div>
+      <div ${ST('width:40%;text-align:center')}><div ${ST('border-top:1pt solid #000;margin-bottom:5pt')}></div><b>${proprietario}</b><br><span ${ST('font-size:9pt')}>Proprietário / Posseiro<br>CPF: _________________________</span></div>
+    </div>
+    <p ${ST('text-align:center;font-size:8pt;color:#aaa;margin-top:18pt')}>GeoSistema PRO · Avaliação Imobiliária NBR 14.653 · ${hoje} · ${datum}</p>
+    </div>`;
+  }
+
+  // ── REGISTRO FOTOGRÁFICO ──
+  if(fotosImovel.length){
+    html+=`<div ${ST('page-break-before:always')}>
+    <div ${ST('display:flex;justify-content:space-between;border-bottom:1pt solid #ddd;padding-bottom:6pt;margin-bottom:12pt')}>
+      <b ${ST('font-size:10pt')}>GEOSISTEMA PRO — Registro Fotográfico</b>
+      <span ${ST('font-size:8pt;color:#777')}>${hoje}</span>
+    </div>
+    <h4 ${ST('margin:0 0 12pt;font-size:11pt')}>REGISTRO FOTOGRÁFICO DO IMÓVEL</h4>
+    <div ${ST('display:grid;grid-template-columns:1fr 1fr;gap:14pt')}>`;
+    fotosImovel.forEach((f,i)=>{
+      html+=`<div ${ST('break-inside:avoid;page-break-inside:avoid')}>
+        <img src="${f.dataUrl}" ${ST('width:100%;height:140pt;object-fit:cover;border:0.5pt solid #ccc;display:block;border-radius:3pt')}>
+        <p ${ST('font-size:8pt;color:#444;text-align:center;margin:4pt 0 0;border-top:0.5pt solid #eee;padding-top:3pt')}>
+          <b>Foto ${i+1}</b>${f.legenda?' — '+f.legenda:''}
+        </p>
+      </div>`;
+    });
+    html+=`</div></div>`;
+  }
+
+  html+=`</div>`; // fecha container principal
+
+  document.getElementById('area-print').innerHTML = html;
+  if(map) map.invalidateSize();
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// BACKUP / RESTORE — salva e restaura toda a avaliação em JSON
+// ─────────────────────────────────────────────────────────────
+function _coletarEstado() {
+  return {
+    _versao: '2.0',
+    _data: new Date().toISOString(),
+    // Campos do formulário
+    form: {
+      nomeProprietario: document.getElementById('nomeProprietario')?.value || '',
+      matriculaImovel:  document.getElementById('matriculaImovel')?.value  || '',
+      nomeDatum:        document.getElementById('nomeDatum')?.value         || 'SIRGAS 2000',
+      nomeMunicipio:    document.getElementById('nomeMunicipio')?.value     || '',
+      nomeComarca:      document.getElementById('nomeComarca')?.value       || '',
+      nomeRT:           document.getElementById('nomeRT')?.value            || '',
+      numCREA:          document.getElementById('numCREA')?.value           || '',
+      altBase:          document.getElementById('altBase')?.value           || '0',
+      bingKey:          document.getElementById('bingKey')?.value           || '',
+      // Comparativo
+      caArea:           document.getElementById('ca-area')?.value           || '',
+      caTopo:           document.getElementById('ca-topo')?.value           || '1.00',
+      caSit:            document.getElementById('ca-sit')?.value            || '1.00',
+      // Evolutivo
+      eaArea:           document.getElementById('ea-area')?.value           || '',
+      eaVu:             document.getElementById('ea-vu')?.value             || '',
+      eaFl:             document.getElementById('ea-fl')?.value             || '1.00',
+      eaFc:             document.getElementById('ea-fc')?.value             || '1.00',
+      eaDep:            document.getElementById('ea-dep')?.value            || '0',
+      eaGa:             document.getElementById('ea-ga')?.value             || '1.00',
+      // Vistoria
+      vData:   document.getElementById('v-data')?.value   || '',
+      vHora:   document.getElementById('v-hora')?.value   || '',
+      vResp:   document.getElementById('v-resp')?.value   || '',
+      vAcesso: document.getElementById('v-acesso')?.value || '',
+      vOcup:   document.getElementById('v-ocup')?.value   || '',
+      vObs:    document.getElementById('v-obs')?.value    || '',
+      // Fatores
+      fatPadrao: document.getElementById('fat-padrao')?.value || '',
+      fatInfra:  document.getElementById('fat-infra')?.value  || '',
+      fatTopo:   document.getElementById('fat-topo')?.value   || '',
+      fatVeg:    document.getElementById('fat-veg')?.value    || '',
+      fatCons:   document.getElementById('fat-cons')?.value   || '',
+      fatObs:    document.getElementById('fat-obs')?.value    || '',
+      // Laudo
+      lVal:             document.getElementById('l-val')?.value             || '',
+      lGrau:            document.getElementById('l-grau')?.value            || '0.15',
+      lFin:             document.getElementById('l-fin')?.value             || '',
+    },
+    // Dados estruturais
+    pontosPoligonal,
+    amostras,
+    elementos,
+    benfeitorias,
+    // Mapa capturado (dataUrl ou URL) — pode ser grande
+    mapaCapturadoDataUrl,
+    // Fontes das amostras
+    fontes,
+    // Fotos: salva dataUrl + legenda
+    fotosImovel: fotosImovel.map(f => ({ dataUrl: f.dataUrl, legenda: f.legenda })),
+  };
+}
+
+function salvarBackup() {
+  const estado = _coletarEstado();
+  const proprietario = estado.form.nomeProprietario.split(' ')[0] || 'avaliacao';
+  const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+  const nomeArq = `backup_${proprietario}_${hoje}.json`;
+  const json = JSON.stringify(estado, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: nomeArq
+  });
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 200);
+}
+
+function restaurarBackup(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const estado = JSON.parse(e.target.result);
+      if (!estado._versao) throw new Error('Arquivo inválido ou formato desconhecido.');
+
+      // Restaura formulários
+      const f = estado.form || {};
+      const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+      set('nomeProprietario', f.nomeProprietario);
+      set('matriculaImovel',  f.matriculaImovel);
+      set('nomeDatum',        f.nomeDatum);
+      set('nomeMunicipio',    f.nomeMunicipio);
+      set('nomeComarca',      f.nomeComarca);
+      set('nomeRT',           f.nomeRT);
+      set('numCREA',          f.numCREA);
+      set('altBase',          f.altBase);
+      set('bingKey',          f.bingKey);
+      if (f.bingKey) salvarBingKey(f.bingKey);
+      set('ca-area',          f.caArea);
+      set('ca-topo',          f.caTopo);
+      set('ca-sit',           f.caSit);
+      set('ea-area',          f.eaArea);
+      set('ea-vu',            f.eaVu);
+      set('ea-fl',            f.eaFl);
+      set('ea-fc',            f.eaFc);
+      set('ea-dep',           f.eaDep);
+      set('ea-ga',            f.eaGa);
+      set('v-data',   f.vData);
+      set('v-hora',   f.vHora);
+      set('v-resp',   f.vResp);
+      set('v-acesso', f.vAcesso);
+      set('v-ocup',   f.vOcup);
+      set('v-obs',    f.vObs);
+      set('fat-padrao', f.fatPadrao);
+      set('fat-infra',  f.fatInfra);
+      set('fat-topo',   f.fatTopo);
+      set('fat-veg',    f.fatVeg);
+      set('fat-cons',   f.fatCons);
+      set('fat-obs',    f.fatObs);
+      set('l-val',            f.lVal);
+      set('l-grau',           f.lGrau);
+      set('l-fin',            f.lFin);
+
+      // Restaura dados estruturais
+      pontosPoligonal = estado.pontosPoligonal || [];
+      amostras        = estado.amostras        || [];
+      elementos       = estado.elementos       || [];
+      benfeitorias    = estado.benfeitorias    || [];
+
+      // Restaura fontes
+      fontes = estado.fontes || [];
+      renderFontes();
+
+      // Restaura mapa capturado
+      mapaCapturadoDataUrl = estado.mapaCapturadoDataUrl || null;
+      if (mapaCapturadoDataUrl) {
+        document.getElementById('img-mapa-preview').src = mapaCapturadoDataUrl;
+        document.getElementById('preview-mapa-capturado').style.display = 'block';
+      } else {
+        document.getElementById('preview-mapa-capturado').style.display = 'none';
+      }
+
+      // Restaura fotos
+      fotosImovel = (estado.fotosImovel || []).map((f, i) => ({
+        id: Date.now() + i,
+        dataUrl: f.dataUrl,
+        legenda: f.legenda || ''
+      }));
+
+      // Atualiza interface
+      renderListaVertices();
+      renderElementos();
+      renderBenfeitorias();
+      renderListaAmostras();
+      renderFotos();
+      atualizarBadges();
+
+      // Redesenha mapa e recalcula
+      if (pontosPoligonal.length) {
+        if (!mapIniciado) {
+          setTimeout(() => { initMap(); setTimeout(() => { desenharPoligonal(); calcularPoligonal(); }, 400); }, 200);
+        } else {
+          // Limpa marcadores de amostras antigos do mapa
+          marcadoresAmostras.forEach(m => map && map.removeLayer(m.mk));
+          marcadoresAmostras = [];
+          desenharPoligonal();
+          calcularPoligonal();
+          amostras.forEach(a => adicionarMarcadorAmostra(a));
+        }
+      }
+
+      calcComparativo();
+      calcEvolutivo();
+
+      const data = new Date(estado._data).toLocaleString('pt-BR');
+      alert('✓ Avaliação restaurada com sucesso!\nSalvo em: ' + data);
+    } catch(err) {
+      alert('Erro ao restaurar: ' + err.message);
+    }
+    input.value = ''; // limpa o input para permitir carregar o mesmo arquivo novamente
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// FONTES DAS AMOSTRAS
+// ─────────────────────────────────────────────────────────────
+let fontes = [];
+
+function addFonte() {
+  fontes.push({ id: Date.now(), origem: '', tipo: '', data: '', contato: '' });
+  renderFontes();
+}
+
+function updFonte(id, campo, val) {
+  const f = fontes.find(x => x.id === id);
+  if (f) f[campo] = val;
+}
+
+function removerFonte(id) {
+  fontes = fontes.filter(x => x.id !== id);
+  renderFontes();
+}
+
+function renderFontes() {
+  const el = document.getElementById('fontes-lista');
+  if (!el) return;
+  if (!fontes.length) {
+    el.innerHTML = '<div style="font-size:12px;color:#aaa;padding:6px">Nenhuma fonte cadastrada. Clique em "+ Adicionar fonte".</div>';
+    return;
+  }
+  const TIPOS = ['','Oferta — anúncio internet','Oferta — imobiliária','Transação — escritura pública',
+    'Transação — contrato particular','Avaliação anterior','Pesquisa de campo','Dado cartorial','Outro'];
+  el.innerHTML = fontes.map((f, i) => `
+    <div style="display:grid;grid-template-columns:2fr 1.5fr 1fr 2fr auto;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0f0">
+      <div>
+        <span class="flabel">Origem / Identificação</span>
+        <input type="text" value="${f.origem.replace(/"/g,'&quot;')}" placeholder="Ex: Amostra 1 — Rua X, nº Y"
+          class="finput" style="height:30px;font-size:12px" oninput="updFonte(${f.id},'origem',this.value)">
+      </div>
+      <div>
+        <span class="flabel">Tipo</span>
+        <select class="finput" style="height:30px;font-size:12px" onchange="updFonte(${f.id},'tipo',this.value)">
+          ${TIPOS.map(t=>`<option ${f.tipo===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <span class="flabel">Data</span>
+        <input type="date" value="${f.data}" class="finput" style="height:30px;font-size:12px"
+          onchange="updFonte(${f.id},'data',this.value)">
+      </div>
+      <div>
+        <span class="flabel">Contato / Referência</span>
+        <input type="text" value="${f.contato.replace(/"/g,'&quot;')}" placeholder="Corretor, link, nº ofício..."
+          class="finput" style="height:30px;font-size:12px" oninput="updFonte(${f.id},'contato',this.value)">
+      </div>
+      <div style="padding-top:14px">
+        <button class="btn btn-red btn-sm" style="padding:0 8px" onclick="removerFonte(${f.id})">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Inicializar listas vazias
+renderListaVertices();
+renderElementos();
+renderBenfeitorias();
+renderListaAmostras();
+renderFotos();
+renderFontes();
+</script>
+</body>
+</html>
